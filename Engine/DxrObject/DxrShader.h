@@ -6,13 +6,11 @@
 // directX
 #include <d3d12.h>
 #include <dxgi1_6.h>
-#include "externals/DirectXTex/d3dx12.h"
+#include <dxcapi.h>
 
 // c++
-#include <cstdint>
 #include <cassert>
 
-// ComPtr
 #include <ComPtr.h>
 
 //-----------------------------------------------------------------------------------------
@@ -20,30 +18,37 @@
 //-----------------------------------------------------------------------------------------
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxcompiler.lib")
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-// DxrObjectMethod namespace
+// DxrObject namespace
 ////////////////////////////////////////////////////////////////////////////////////////////
-namespace DxrObjectMethod {
+namespace DxrObject {
 
-	ComPtr<ID3D12Resource> CreateBufferResource(
-		ID3D12Device5* device,
-		uint64_t size,
-		D3D12_RESOURCE_FLAGS flag,
-		D3D12_RESOURCE_STATES initalizeState,
-		const D3D12_HEAP_PROPERTIES& prop
-	);
+	////////////////////////////////////////////////////////////////////////////////////////////
+	// Shader class
+	////////////////////////////////////////////////////////////////////////////////////////////
+	class Shader {
+	public:
 
-	ComPtr<ID3D12RootSignature> CreateRootSignature(
-		ID3D12Device5* device,
-		const D3D12_ROOT_SIGNATURE_DESC& desc
-	);
+		Shader() { Init(); }
 
-	// 仮定義
-	static const D3D12_HEAP_PROPERTIES kUploadHeapProps
-		= CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		~Shader() { Term(); }
 
-	static const D3D12_HEAP_PROPERTIES kDefaultHeapProps
-		= CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		void Init();
+
+		void Term();
+
+	private:
+
+		ComPtr<IDxcLibrary> library_;
+		ComPtr<IDxcCompiler> compiler_;
+
+		ComPtr<IDxcBlob> shaderBlob_;
+
+		static const LPCWSTR kShaderFileName_;
+		static const LPCWSTR kShaderModel_;
+
+	};
 
 }

@@ -50,6 +50,10 @@ public:
 
 	void EndFrame();
 
+	DxrObject::Devices* GetDevicesObj() { return devices_.get(); }
+
+	DxrObject::Command* GetCommandObj() { return command_.get(); }
+
 
 	static DxrCommon* GetInstance();
 

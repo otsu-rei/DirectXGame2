@@ -97,6 +97,9 @@
     <Filter Include="Engine\DxrObject\source">
       <UniqueIdentifier>{d4e808f0-59d0-4f07-bc11-d0e972703443}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{5ead299d-f030-4c8b-91ea-608e90896552}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -244,10 +247,22 @@
     <ClCompile Include="Engine\DxrObject\DxrFence.cpp">
       <Filter>Engine\DxrObject\source</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\DxrObject\DxrAccelerationStructure.cpp">
+    <ClCompile Include="Engine\DxrObject\DxrObjectMethods.cpp">
       <Filter>Engine\DxrObject\source</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\DxrObject\DxrObjectMethods.cpp">
+    <ClCompile Include="Game\Triangle.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\DxrObject\DxrBufferResource.cpp">
+      <Filter>Engine\DxrObject\source</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\DxrObject\DxrPipeline.cpp">
+      <Filter>Engine\DxrObject\source</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\DxrObject\DxrShader.cpp">
+      <Filter>Engine\DxrObject\source</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\DxrObject\DxrStateObject.cpp">
       <Filter>Engine\DxrObject\source</Filter>
     </ClCompile>
   </ItemGroup>
@@ -408,10 +423,22 @@
     <ClInclude Include="Engine\DxrObject\DxrFence.h">
       <Filter>Engine\DxrObject\include</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\DxrObject\DxrAccelerationStructure.h">
+    <ClInclude Include="Engine\DxrObject\DxrObjectMethods.h">
       <Filter>Engine\DxrObject\include</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\DxrObject\DxrObjectMethods.h">
+    <ClInclude Include="Game\Triangle.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DxrObject\DxrBufferResource.h">
+      <Filter>Engine\DxrObject\include</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DxrObject\DxrPipeline.h">
+      <Filter>Engine\DxrObject\include</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DxrObject\DxrShader.h">
+      <Filter>Engine\DxrObject\include</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\DxrObject\DxrStateObject.h">
       <Filter>Engine\DxrObject\include</Filter>
     </ClInclude>
   </ItemGroup>

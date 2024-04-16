@@ -202,3 +202,13 @@ void MyDxrEngine::EndFrame() {
 int MyDxrEngine::ProcessMessage() {
 	return sWinApp->ProcessMessage() ? 1 : 0;
 }
+
+DxrObject::Devices* MyDxrEngine::GetDevicesObj() {
+	assert(sDxrCommon);
+	return sDxrCommon->GetDevicesObj();
+}
+
+DxrObject::Command* MyDxrEngine::GetCommandObj() {
+	assert(sDxrCommon);
+	return sDxrCommon->GetCommandObj();
+}
