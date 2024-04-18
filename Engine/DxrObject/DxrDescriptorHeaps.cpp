@@ -108,3 +108,14 @@ const uint32_t DxrObject::DescriptorHeaps::GetDescriptorCurrentIndex(DescriptorT
 
 	return result;
 }
+
+DxrObject::Descriptor DxrObject::DescriptorHeaps::GetCurrentDescriptor(DescriptorType type) {
+	Descriptor result;
+
+	result.index = GetDescriptorCurrentIndex(type);
+	result.handleCPU = GetCPUDescriptorHandle(type, result.index);
+	result.handleGPU = GetGPUDescriptorHandle(type, result.index);
+	result.type = type;
+
+	return result;
+}

@@ -76,18 +76,6 @@
     <Filter Include="externals\imgui">
       <UniqueIdentifier>{7ed608b7-008b-4b29-af56-0edd4f20a9c3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resource">
-      <UniqueIdentifier>{47c11d8e-7ba0-4897-96f0-4f075fed9977}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource\hlsl">
-      <UniqueIdentifier>{4a0a5389-70df-42d6-a5fc-9ee50eebc35f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource\hlsl\Particle">
-      <UniqueIdentifier>{5e8f90bf-919d-4dc8-a78c-0c02bd22b8f5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Resource\hlsl\Floor">
-      <UniqueIdentifier>{caff2c69-010b-4713-a983-b786b400b167}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\DxrObject">
       <UniqueIdentifier>{749f3f9b-184f-4b27-8ed8-a2d3be3e8c31}</UniqueIdentifier>
     </Filter>
@@ -99,6 +87,21 @@
     </Filter>
     <Filter Include="Game">
       <UniqueIdentifier>{5ead299d-f030-4c8b-91ea-608e90896552}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{47c11d8e-7ba0-4897-96f0-4f075fed9977}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\hlsl">
+      <UniqueIdentifier>{4a0a5389-70df-42d6-a5fc-9ee50eebc35f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\hlsl\Particle">
+      <UniqueIdentifier>{5e8f90bf-919d-4dc8-a78c-0c02bd22b8f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\hlsl\Floor">
+      <UniqueIdentifier>{caff2c69-010b-4713-a983-b786b400b167}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\DxrHlsl">
+      <UniqueIdentifier>{b71dce2c-8763-45ce-a3e3-efd2ff08e91e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -445,10 +448,10 @@
   <ItemGroup>
     <None Include=".editorconfig" />
     <None Include="Resources\hlsl\Particle.hlsli">
-      <Filter>Resource\hlsl\Particle</Filter>
+      <Filter>Resources\hlsl\Particle</Filter>
     </None>
     <None Include="Resources\hlsl\Floor.hlsli">
-      <Filter>Resource\hlsl\Floor</Filter>
+      <Filter>Resources\hlsl\Floor</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -458,22 +461,25 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\hlsl\Particle.VS.hlsl">
-      <Filter>Resource\hlsl\Particle</Filter>
+      <Filter>Resources\hlsl\Particle</Filter>
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Particle.GS.hlsl">
-      <Filter>Resource\hlsl\Particle</Filter>
+      <Filter>Resources\hlsl\Particle</Filter>
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Particle.PS.hlsl">
-      <Filter>Resource\hlsl\Particle</Filter>
+      <Filter>Resources\hlsl\Particle</Filter>
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Floor.VS.hlsl">
-      <Filter>Resource\hlsl\Floor</Filter>
+      <Filter>Resources\hlsl\Floor</Filter>
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Floor.GS.hlsl">
-      <Filter>Resource\hlsl\Floor</Filter>
+      <Filter>Resources\hlsl\Floor</Filter>
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Floor.PS.hlsl">
-      <Filter>Resource\hlsl\Floor</Filter>
+      <Filter>Resources\hlsl\Floor</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\DxrHlsl\RayTracing.hlsl">
+      <Filter>Resources\DxrHlsl</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

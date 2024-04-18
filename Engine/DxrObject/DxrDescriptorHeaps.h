@@ -43,6 +43,16 @@ namespace DxrObject {
 	};
 
 	////////////////////////////////////////////////////////////////////////////////////////////
+	// Descriptor structure
+	////////////////////////////////////////////////////////////////////////////////////////////
+	struct Descriptor {
+		uint32_t index;
+		DescriptorType type;
+		D3D12_CPU_DESCRIPTOR_HANDLE handleCPU;
+		D3D12_GPU_DESCRIPTOR_HANDLE handleGPU;
+	};
+
+	////////////////////////////////////////////////////////////////////////////////////////////
 	// DescriptorHeaps class
 	////////////////////////////////////////////////////////////////////////////////////////////
 	class DescriptorHeaps {
@@ -74,6 +84,13 @@ namespace DxrObject {
 		//! 
 		//! @return 使用できるDescriptorsのindexを返却
 		const uint32_t GetDescriptorCurrentIndex(DescriptorType type);
+
+		//! @breif 使用できるDescriptorsのindexを取得
+		//! 
+		//! @param[in] type DescriptorType
+		//! 
+		//! @return 使用できるDescriptorsのindexを返却
+		Descriptor GetCurrentDescriptor(DescriptorType type);
 
 		//! @brief CPUDescriptorHandleの取得
 		//! 

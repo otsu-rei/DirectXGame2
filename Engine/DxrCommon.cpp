@@ -1,9 +1,25 @@
 #include "DxrCommon.h"
 
+#include <Vector3.h>
+#include "DxrObjectMethods.h"
+#include <array>
+
+#include "Logger.h"
+
 //-----------------------------------------------------------------------------------------
 // using
 //-----------------------------------------------------------------------------------------
 using namespace DxrObject;
+using namespace DxrObjectMethod;
+
+const LPCWSTR DxrCommon::kShaderModel_ = L"lib_6_3";
+const LPCWSTR DxrCommon::kShaderFileName_ = L"./Resources/DxrHlsl/RayTracing.hlsl";
+
+const LPCWSTR DxrCommon::kRayGenerationFunctionName_ = L"mainRayGen";
+const LPCWSTR DxrCommon::kClosestHitFunctionName_ = L"mainCHS";
+const LPCWSTR DxrCommon::kMissFunctionName_ = L"mainMS";
+
+const LPCWSTR DxrCommon::kHitGroup_ = L"hitGroup";
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // DxrCommon class methods
@@ -18,6 +34,13 @@ void DxrCommon::Init(WinApp* winApp, int32_t clientWidth, int32_t clientHeight) 
 		winApp, clientWidth, clientHeight
 	);
 	fence_           = std::make_unique<Fence>(devices_.get());
+
+	CreateBLAS();
+	CreateTLAS();
+	CreateRootSignatureGlobal();
+	CreateShaderBlob();
+	CreateStateObject();
+	CreateResultBuffer(clientWidth, clientHeight);
 }
 
 void DxrCommon::Term() {
@@ -78,7 +101,476 @@ void DxrCommon::EndFrame() {
 	command_->Reset();
 }
 
+void DxrCommon::Sent() {
+	command_->Close();
+
+	// GPUにシグナルを送る
+	fence_->AddFenceValue();
+
+	command_->Signal(fence_.get());
+
+	fence_->WaitGPU();
+
+	command_->Reset();
+}
+
 DxrCommon* DxrCommon::GetInstance() {
 	static DxrCommon instance;
 	return &instance;
+}
+
+void DxrCommon::CreateBLAS() {
+	auto device = devices_->GetDevice();
+	auto command = command_->GetCommandList();
+
+	Vector3f tri[3] = {
+		{-0.5f, -0.5f, 0.0f},
+		{0.5f, -0.5f, 0.0f},
+		{0.0f, 0.75f, 0.0f}
+	};
+
+	auto vbSize = sizeof(tri);
+	vertexBuffer_ = CreateBufferResource(
+		devices_->GetDevice(),
+		vbSize,
+		D3D12_RESOURCE_FLAG_NONE,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		kUploadHeapProps
+	);
+
+	// resourceをマッピング
+	WriteToHostVisibleMemory(vertexBuffer_.Get(), tri, vbSize);
+	vertexBuffer_->SetName(L"vertexBuffer_");
+
+	// BLAS
+	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc{};
+	geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	geomDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_->GetGPUVirtualAddress();
+	geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vector3f);
+	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	geomDesc.Triangles.VertexCount = _countof(tri);
+
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildASDesc{};
+	auto& inputs = buildASDesc.Inputs;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	inputs.NumDescs = 1;
+	inputs.pGeometryDescs = &geomDesc;
+
+	// 必要なメモリ量を求める.
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO blasPrebuild{};
+	device->GetRaytracingAccelerationStructurePrebuildInfo(
+		&inputs, &blasPrebuild
+	);
+
+	// スクラッチバッファを確保.
+	ComPtr<ID3D12Resource> blasScratch;
+	blasScratch = CreateBufferResource(
+		device,
+		blasPrebuild.ScratchDataSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		kDefaultHeapProps
+	);
+
+	blas_ = CreateBufferResource(
+		device,
+		blasPrebuild.ResultDataMaxSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+		kDefaultHeapProps
+	);
+	blas_->SetName(L"test");
+
+	buildASDesc.ScratchAccelerationStructureData = blasScratch->GetGPUVirtualAddress();
+	buildASDesc.DestAccelerationStructureData = blas_->GetGPUVirtualAddress();
+
+	command->BuildRaytracingAccelerationStructure(
+		&buildASDesc, 0, nullptr
+	);
+
+	// リソースバリアの設定.
+	D3D12_RESOURCE_BARRIER uavBarrier = {};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = blas_.Get();
+	command->ResourceBarrier(1, &uavBarrier);
+
+	// BLAS 構築.
+	Sent();
+}
+
+void DxrCommon::CreateTLAS() {
+	auto device = devices_->GetDevice();
+	auto command = command_->GetCommandList();
+
+	D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
+	instanceDesc.InstanceID = 0;
+	instanceDesc.InstanceMask = 0xFF;
+	instanceDesc.InstanceContributionToHitGroupIndex = 0;
+	instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+	instanceDesc.AccelerationStructure = blas_->GetGPUVirtualAddress();
+	Matrix4x4 mat = Matrix4x4::MakeIdentity();
+	mat = Matrix::Transpose(mat);
+	memcpy(&instanceDesc.Transform, &mat, sizeof(instanceDesc.Transform));
+
+	// インスタンスの情報を記録したバッファを準備する.
+	ComPtr<ID3D12Resource> instanceDescBuffer;
+	instanceDescBuffer = CreateBufferResource(
+		device,
+		sizeof(instanceDesc),
+		D3D12_RESOURCE_FLAG_NONE,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		kUploadHeapProps
+	);
+
+	WriteToHostVisibleMemory(
+		instanceDescBuffer.Get(),
+		&instanceDesc, sizeof(instanceDesc)
+	);
+
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildASDesc{};
+	auto& inputs = buildASDesc.Inputs;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	inputs.NumDescs = 1;
+
+	// 必要なメモリ量を求める.
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO tlasPrebuild{};
+	device->GetRaytracingAccelerationStructurePrebuildInfo(
+		&inputs, &tlasPrebuild
+	);
+
+	// スクラッチバッファを確保.
+	ComPtr<ID3D12Resource> tlasScratch;
+	tlasScratch = CreateBufferResource(
+		device,
+		tlasPrebuild.ScratchDataSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		kDefaultHeapProps
+	);
+
+	// TLAS 用メモリ(バッファ)を確保.
+	// リソースステートは D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
+	tlas_ = CreateBufferResource(
+		device,
+		tlasPrebuild.ResultDataMaxSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+		kDefaultHeapProps
+	);
+	tlas_->SetName(L"tlas_");
+
+	// Acceleration Structure 構築.
+	buildASDesc.Inputs.InstanceDescs = instanceDescBuffer->GetGPUVirtualAddress();
+	buildASDesc.ScratchAccelerationStructureData = tlasScratch->GetGPUVirtualAddress();
+	buildASDesc.DestAccelerationStructureData = tlas_->GetGPUVirtualAddress();
+
+	// コマンドリストに積んで実行する.
+	command->BuildRaytracingAccelerationStructure(
+		&buildASDesc, 0, nullptr /* pPostBuildInfoDescs */
+	);
+
+	// リソースバリアの設定.
+	D3D12_RESOURCE_BARRIER uavBarrier{};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = tlas_.Get();
+	command->ResourceBarrier(1, &uavBarrier);
+
+	// TLAS 構築.
+	Sent();
+
+	// ディスクリプタの準備.
+	tlasDescriptor_ = descriptorHeaps_->GetCurrentDescriptor(SRV);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.RaytracingAccelerationStructure.Location = tlas_->GetGPUVirtualAddress();
+	device->CreateShaderResourceView(nullptr, &srvDesc, tlasDescriptor_.handleCPU);
+}
+
+void DxrCommon::CreateRootSignatureGlobal() {
+	auto device = devices_->GetDevice();
+
+	std::array<D3D12_ROOT_PARAMETER, 2> rootParams{};
+
+	// TLAS を t0 レジスタに割り当てて使用する設定.
+	D3D12_DESCRIPTOR_RANGE descRangeTLAS{};
+	descRangeTLAS.BaseShaderRegister = 0;
+	descRangeTLAS.NumDescriptors = 1;
+	descRangeTLAS.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+
+	// 出力バッファ(UAV) を u0 レジスタに割り当てて使用する設定.
+	D3D12_DESCRIPTOR_RANGE descRangeOutput{};
+	descRangeOutput.BaseShaderRegister = 0;
+	descRangeOutput.NumDescriptors = 1;
+	descRangeOutput.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+
+	rootParams[0] = D3D12_ROOT_PARAMETER{};
+	rootParams[1] = D3D12_ROOT_PARAMETER{};
+
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &descRangeTLAS;
+
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[1].DescriptorTable.pDescriptorRanges = &descRangeOutput;
+
+	D3D12_ROOT_SIGNATURE_DESC rootSigDesc{};
+	rootSigDesc.NumParameters = UINT(rootParams.size());
+	rootSigDesc.pParameters = rootParams.data();
+
+	HRESULT hr;
+	ComPtr<ID3DBlob> blob, errBlob;
+	hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &blob, &errBlob);
+	if (FAILED(hr)) {
+		assert(false);
+	}
+
+	hr = device->CreateRootSignature(
+		0, blob->GetBufferPointer(), blob->GetBufferSize(),
+		IID_PPV_ARGS(rootSignatureGlobal_.ReleaseAndGetAddressOf())
+	);
+	if (FAILED(hr)) {
+		assert(false);
+	}
+	rootSignatureGlobal_->SetName(L"rootSignatureGlobal_");
+}
+
+void DxrCommon::CreateShaderBlob() {
+	ComPtr<IDxcLibrary> library;
+	ComPtr<IDxcCompiler> compiler;
+
+	auto hr = DxcCreateInstance(
+		CLSID_DxcLibrary, IID_PPV_ARGS(&library)
+	);
+	assert(SUCCEEDED(hr));
+
+	hr = DxcCreateInstance(
+		CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)
+	);
+	assert(SUCCEEDED(hr));
+
+	ComPtr<IDxcBlobEncoding> source;
+	hr = library->CreateBlobFromFile(
+		kShaderFileName_, nullptr, &source
+	);
+	assert(SUCCEEDED(hr));
+
+	ComPtr<IDxcOperationResult> result;
+	hr = compiler->Compile(
+		source.Get(),
+		kShaderFileName_,
+		L"",
+		kShaderModel_,
+		nullptr,
+		0,
+		nullptr,
+		0,
+		nullptr,
+		&result
+	);
+	assert(SUCCEEDED(hr));
+
+	ComPtr<IDxcBlobEncoding> errorBlob;
+	hr = result->GetErrorBuffer(&errorBlob);
+
+	if (SUCCEEDED(hr)) {
+		if (errorBlob != nullptr && errorBlob->GetBufferSize() != 0) {
+			// エラーメッセージを表示するか、適切な処理を行う
+			Log(reinterpret_cast<const char*>(errorBlob->GetBufferPointer()));
+			assert(false);
+		}
+	}
+
+	hr = result->GetResult(&shaderBlob_);
+	assert(SUCCEEDED(hr));
+
+}
+	
+
+void DxrCommon::CreateStateObject() {
+	auto device = devices_->GetDevice();
+
+	CD3DX12_STATE_OBJECT_DESC stateObjectDesc{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+	auto dxilLibrarySubobject
+		= stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+
+	D3D12_SHADER_BYTECODE libdxil = {};
+	libdxil.BytecodeLength = shaderBlob_->GetBufferSize();
+	libdxil.pShaderBytecode = shaderBlob_->GetBufferPointer();
+
+	LPCWSTR exports[] = {
+		kRayGenerationFunctionName_, kClosestHitFunctionName_, kMissFunctionName_
+	};
+
+	dxilLibrarySubobject->SetDXILLibrary(&libdxil);
+	dxilLibrarySubobject->DefineExports(exports);
+
+	auto hitGroupSubobject
+		= stateObjectDesc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+
+	hitGroupSubobject->SetClosestHitShaderImport(kClosestHitFunctionName_);
+	hitGroupSubobject->SetHitGroupExport(kHitGroup_);
+	hitGroupSubobject->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
+	auto shaderConfig
+		= stateObjectDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+
+	uint32_t payloadSize = static_cast<uint32_t>(sizeof(Vector3f));
+	uint32_t attributeSize = static_cast<uint32_t>(sizeof(Vector2f));
+
+	shaderConfig->Config(payloadSize, attributeSize);
+
+	// localがないので飛ばしとく error出たらここが原因かも
+
+	auto grobalRootSignatureSubobject
+		= stateObjectDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+
+	grobalRootSignatureSubobject->SetRootSignature(rootSignatureGlobal_.Get());
+
+	auto pipelineConfigSubobject
+		= stateObjectDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+
+	uint32_t maxRecursionDepth = 1; //!< Max31
+
+	pipelineConfigSubobject->Config(maxRecursionDepth);
+
+	auto hr = device->CreateStateObject(stateObjectDesc, IID_PPV_ARGS(&stateObject_));
+	assert(SUCCEEDED(hr));
+}
+
+void DxrCommon::CreateResultBuffer(int32_t clientWidth, int32_t clientHeight) {
+	auto device = devices_->GetDevice();
+
+	outputResource_ = CreateTexture2D(
+		device,
+		clientWidth, clientHeight,
+		DXGI_FORMAT_R8G8B8A8_UNORM,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		kDefaultHeapProps
+	);
+
+	// ディスクリプタの準備.
+	outputDescriptor_ = descriptorHeaps_->GetCurrentDescriptor(SRV);
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+	device->CreateUnorderedAccessView(outputResource_.Get(), nullptr, &uavDesc, outputDescriptor_.handleCPU);
+}
+
+void DxrCommon::CreateShaderTable() {
+	auto device = devices_->GetDevice();
+
+	// 各シェーダーレコードは Shader Identifier を保持する.
+	UINT recordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+	// グローバルのルートシグネチャ以外の情報を持たないのでレコードサイズはこれだけ.
+
+	// あとはアライメント制約を保つようにする.
+	recordSize = Alignment(recordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+
+	// シェーダーテーブルのサイズを求める.
+	UINT raygenSize = 1 * recordSize;   // 今1つの Ray Generation シェーダー.
+	UINT missSize = 1 * recordSize;     // 今1つの Miss シェーダー.
+	UINT hitGroupSize = 1 * recordSize; // 今1つの HitGroup を使用.
+
+	// 各テーブルの開始位置にアライメント制約があるので調整する.
+	auto tableAlign = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+	UINT raygenRegion = Alignment(raygenSize, tableAlign);
+	UINT missRegion = Alignment(missSize, tableAlign);
+	UINT hitgroupRegion = Alignment(hitGroupSize, tableAlign);
+
+	// シェーダーテーブル確保.
+	auto tableSize = raygenRegion + missRegion + hitgroupRegion;
+	shaderTable_ = CreateBufferResource(
+		device,
+		tableSize,
+		D3D12_RESOURCE_FLAG_NONE,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		kUploadHeapProps
+	);
+
+	ComPtr<ID3D12StateObjectProperties> rtsoProps;
+	m_rtState.As(&rtsoProps);
+
+	// 各シェーダーレコードを書き込んでいく.
+	void* mapped = nullptr;
+	shaderTable_->Map(0, nullptr, &mapped);
+	uint8_t* pStart = static_cast<uint8_t*>(mapped);
+
+	// RayGeneration 用のシェーダーレコードを書き込み.
+	auto rgsStart = pStart;
+	{
+		uint8_t* p = rgsStart;
+		auto id = rtsoProps->GetShaderIdentifier(kRayGenerationFunctionName_);
+		if (id == nullptr) {
+			throw std::logic_error("Not found ShaderIdentifier");
+		}
+		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+		// ローカルルートシグネチャ使用時には他のデータを書き込む.
+	}
+
+	// Miss Shader 用のシェーダーレコードを書き込み.
+	auto missStart = pStart + raygenRegion;
+	{
+		uint8_t* p = missStart;
+		auto id = rtsoProps->GetShaderIdentifier(kMissFunctionName_);
+		if (id == nullptr) {
+			throw std::logic_error("Not found ShaderIdentifier");
+		}
+		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+		// ローカルルートシグネチャ使用時には他のデータを書き込む.
+	}
+
+	// Hit Group 用のシェーダーレコードを書き込み.
+	auto hitgroupStart = pStart + raygenRegion + missRegion;
+	{
+		uint8_t* p = hitgroupStart;
+		auto id = rtsoProps->GetShaderIdentifier(kHitGroup_);
+		if (id == nullptr) {
+			throw std::logic_error("Not found ShaderIdentifier");
+		}
+		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+
+		// ローカルルートシグネチャ使用時には他のデータを書き込む.
+	}
+
+	shaderTable_->Unmap(0, nullptr);
+
+	// DispatchRays のために情報をセットしておく.
+	auto startAddress = shaderTable_->GetGPUVirtualAddress();
+	auto& shaderRecordRG = m_dispatchRayDesc.RayGenerationShaderRecord;
+	shaderRecordRG.StartAddress = startAddress;
+	shaderRecordRG.SizeInBytes = raygenSize;
+	startAddress += raygenRegion;
+
+	auto& shaderRecordMS = m_dispatchRayDesc.MissShaderTable;
+	shaderRecordMS.StartAddress = startAddress;
+	shaderRecordMS.SizeInBytes = missSize;
+	shaderRecordMS.StrideInBytes = recordSize;
+	startAddress += missRegion;
+
+	auto& shaderRecordHG = m_dispatchRayDesc.HitGroupTable;
+	shaderRecordHG.StartAddress = startAddress;
+	shaderRecordHG.SizeInBytes = hitGroupSize;
+	shaderRecordHG.StrideInBytes = recordSize;
+	startAddress += hitgroupRegion;
+
+	m_dispatchRayDesc.Width = GetWidth();
+	m_dispatchRayDesc.Height = GetHeight();
+	m_dispatchRayDesc.Depth = 1;
 }

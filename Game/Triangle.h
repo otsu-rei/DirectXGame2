@@ -31,7 +31,7 @@ private:
 	// private variables
 	//=========================================================================================
 
-	std::unique_ptr<DxrObject::BufferResource<Vector4f>> vertex_;
+	std::unique_ptr<DxrObject::BufferResource<Vector3f>> vertex_;
 
 	ComPtr<ID3D12Resource> bottomLevelAS_;
 	ComPtr<ID3D12Resource> topLevelAS_;

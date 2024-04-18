@@ -28,7 +28,7 @@ namespace DxrObject {
 	////////////////////////////////////////////////////////////////////////////////////////////
 	// Shader class
 	////////////////////////////////////////////////////////////////////////////////////////////
-	class Shader {
+	class Shader { // stateObject
 	public:
 
 		Shader() { Init(); }
@@ -48,6 +48,11 @@ namespace DxrObject {
 
 		static const LPCWSTR kShaderFileName_;
 		static const LPCWSTR kShaderModel_;
+
+		static const LPCWSTR kDefaultHitGroup_;
+
+		// stateObject
+		D3D12_STATE_SUBOBJECT subObjects[32];
 
 	};
 

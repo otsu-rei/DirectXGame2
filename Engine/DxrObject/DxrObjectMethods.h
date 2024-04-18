@@ -46,4 +46,17 @@ namespace DxrObjectMethod {
 	static const D3D12_HEAP_PROPERTIES kDefaultHeapProps
 		= CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
+	void WriteToHostVisibleMemory(ID3D12Resource* resource, const void* pData, size_t dataSize);
+
+	ComPtr<ID3D12Resource> CreateTexture2D(
+		ID3D12Device5* device,
+		UINT width, UINT height,
+		DXGI_FORMAT format,
+		D3D12_RESOURCE_FLAGS flags,
+		D3D12_RESOURCE_STATES initialState,
+		const D3D12_HEAP_PROPERTIES& prop
+	);
+
+	UINT Alignment(size_t size, UINT align);
+
 }

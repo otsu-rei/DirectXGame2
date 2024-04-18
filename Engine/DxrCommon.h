@@ -19,6 +19,28 @@
 #include <DxrSwapChain.h>
 #include <DxrFence.h>
 
+// directX
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <dxcapi.h>
+
+// c++
+#include <cassert>
+
+#include <ComPtr.h>
+
+// object
+#include "Game/Triangle.h"
+
+//-----------------------------------------------------------------------------------------
+// comment
+//-----------------------------------------------------------------------------------------
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxcompiler.lib")
+
+
+
 //-----------------------------------------------------------------------------------------
 // forward
 //-----------------------------------------------------------------------------------------
@@ -50,6 +72,8 @@ public:
 
 	void EndFrame();
 
+	void Sent();
+
 	DxrObject::Devices* GetDevicesObj() { return devices_.get(); }
 
 	DxrObject::Command* GetCommandObj() { return command_.get(); }
@@ -70,5 +94,52 @@ private:
 	std::unique_ptr<DxrObject::Fence>           fence_;
 
 	UINT backBufferIndex_;
+
+	// object
+	ComPtr<ID3D12Resource> vertexBuffer_;
+
+	ComPtr<ID3D12Resource> blas_;
+	ComPtr<ID3D12Resource> tlas_;
+	DxrObject::Descriptor tlasDescriptor_;
+
+	// global
+	ComPtr<ID3D12RootSignature> rootSignatureGlobal_;
+
+	// shader
+	static const LPCWSTR kShaderModel_;
+	static const LPCWSTR kShaderFileName_;
+	ComPtr<IDxcBlob> shaderBlob_;
+
+	static const LPCWSTR kRayGenerationFunctionName_;
+	static const LPCWSTR kClosestHitFunctionName_;
+	static const LPCWSTR kMissFunctionName_;
+
+	static const LPCWSTR kHitGroup_;
+
+	// stateObject
+	ComPtr<ID3D12StateObject> stateObject_;
+
+	ComPtr<ID3D12Resource> outputResource_;
+	DxrObject::Descriptor outputDescriptor_;
+
+	ComPtr<ID3D12Resource> shaderTable_;
+
+	//=========================================================================================
+	// private methods
+	//=========================================================================================
+
+	void CreateBLAS();
+
+	void CreateTLAS();
+
+	void CreateRootSignatureGlobal();
+
+	void CreateShaderBlob();
+
+	void CreateStateObject();
+
+	void CreateResultBuffer(int32_t clientWidth, int32_t clientHeight);
+
+	void CreateShaderTable();
 
 };
