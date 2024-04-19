@@ -641,10 +641,9 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 }
 
 void DxrCommon::CreateObject() {
-	auto device = devices_->GetDevice();
 
-	auto vstrider = sizeof(VertexData);
-	auto istrider = sizeof(UINT);
+	auto vstrider = UINT(sizeof(VertexData));
+	auto istrider = UINT(sizeof(UINT));
 
 	std::vector<VertexData> vertices;
 	std::vector<UINT>       indices;

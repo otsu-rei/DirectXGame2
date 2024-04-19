@@ -21,6 +21,8 @@
 
 #include <Vector4.h>
 #include <Vector3.h>
+#include <Vector2.h>
+#include <Matrix4x4.h>
 
 // directX
 #include <d3d12.h>
@@ -182,6 +184,8 @@ private:
 	void CreateObject();
 
 	ComPtr<ID3D12Resource> CreateBuffer(size_t size, const void* data, D3D12_HEAP_TYPE type, D3D12_RESOURCE_FLAGS flags, const wchar_t* name);
+
+	DxrObject::Descriptor CreateStructuredSRV();
 
 };
 
