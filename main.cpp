@@ -22,6 +22,8 @@
 // Game
 #include <Logger.h>
 
+#include "DxrCommon.h"
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 // メイン関数
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +40,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	while (MyDxrEngine::ProcessMessage() == 0) {
 
 		/*MyEngine::BeginFrame();*/
-		MyDxrEngine::BeginFrame();
+		/*MyDxrEngine::BeginFrame();*/
+
+		MyDxrEngine::GetDxrCommon()->DxrRender();
 
 		//=========================================================================================
 		// 更新処理
@@ -59,7 +63,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//=========================================================================================
 		
 		/*MyEngine::EndFrame();*/
-		MyDxrEngine::EndFrame();
+		/*MyDxrEngine::EndFrame();*/
 	}
 
 	MyDxrEngine::Finalize();

@@ -124,6 +124,10 @@ namespace DxrObject {
 			);
 		}
 
+		ID3D12DescriptorHeap* GetDescriptorHeap(DescriptorType type) const {
+			return descriptorHeaps_[type].Get();
+		}
+
 	private:
 
 		//=========================================================================================

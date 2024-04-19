@@ -212,3 +212,8 @@ DxrObject::Command* MyDxrEngine::GetCommandObj() {
 	assert(sDxrCommon);
 	return sDxrCommon->GetCommandObj();
 }
+
+DxrCommon* MyDxrEngine::GetDxrCommon() {
+	assert(sDxrCommon);
+	return sDxrCommon;
+}

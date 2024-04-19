@@ -105,6 +105,8 @@ namespace DxrObject {
 		//! @return handleCPU_RTVを返却
 		const D3D12_CPU_DESCRIPTOR_HANDLE& GetHandleCPU_RTV(UINT backBufferIndex) const { return handleCPU_RTV_[backBufferIndex]; }
 
+		ID3D12Resource* GetResource(uint32_t backBufferIndex) const { return swapChainResource_[backBufferIndex].Get(); }
+
 		static const uint32_t GetBufferCount() { return kBufferCount_; }
 
 	private:

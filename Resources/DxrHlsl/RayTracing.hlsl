@@ -10,18 +10,22 @@ struct MyAttrbute {
 
 [shader("raygeneration")]
 void mainRayGen() {
-	uint2 launchIndex = DispatchRaysIndex().xy;
-	float2 dims = float2(DispatchRaysDimensions().xy);
-	float2 d = (launchIndex.xy + 0.5f) / dims.xy * 2.0f - 1.0f;
+	uint3 launchIndex = DispatchRaysIndex();
+	float3 launchDim = DispatchRaysDimensions();
+	
+	float2 crd = float2(launchIndex.xy);
+	float2 dims = float2(launchDim.xy);
+	
+	float2 d = ((crd / dims) * 2.0f - 1.0f);
+	float aspectRaito = dims.x / dims.y;
 	
 	RayDesc rayDesc;
-	rayDesc.Origin = (d.x, d.y, 1);
-	rayDesc.Direction = (0, 0, -1);
-	rayDesc.TMin = 0;
-	rayDesc.TMax = 100000;
+	rayDesc.Origin = float3(0, 0, -2);
+	rayDesc.Direction = normalize(float3(d.x * aspectRaito, -d.y, 1));
+	rayDesc.TMin = 0.0f;
+	rayDesc.TMax = 10000.0f;
 	
 	Payload payload;
-	payload.color = float3(0, 0, 0);
 	
 	RAY_FLAG flags = RAY_FLAG_NONE;
 	uint rayMask = 0xFF;
@@ -44,13 +48,14 @@ void mainRayGen() {
 
 [shader("miss")]
 void mainMS(inout Payload payload) {
-	payload.color = float3(0.4f, 0.8f, 0.9f);
+	payload.color = float3(0.1f, 0.25f, 0.5f);
 }
 
 [shader("closesthit")]
-void mainCHS(inout Payload payload, MyAttrbute attrib) {
+void mainCHS(inout Payload payload, in MyAttrbute attrib) {
 	float3 col = 0.0f;
-	col.xy = attrib.barys;
-	col.z = 1.0f - col.x - col.y;
+	col.x = 1.0f - attrib.barys.x - attrib.barys.y;
+	col.y = attrib.barys.x;
+	col.z = attrib.barys.y;
 	payload.color = col;
 }

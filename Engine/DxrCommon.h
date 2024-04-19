@@ -72,6 +72,8 @@ public:
 
 	void EndFrame();
 
+	void DxrRender(); //!< Test method
+
 	void Sent();
 
 	DxrObject::Devices* GetDevicesObj() { return devices_.get(); }
@@ -123,6 +125,7 @@ private:
 	DxrObject::Descriptor outputDescriptor_;
 
 	ComPtr<ID3D12Resource> shaderTable_;
+	D3D12_DISPATCH_RAYS_DESC dispatchRayDesc_;
 
 	//=========================================================================================
 	// private methods
@@ -140,6 +143,6 @@ private:
 
 	void CreateResultBuffer(int32_t clientWidth, int32_t clientHeight);
 
-	void CreateShaderTable();
+	void CreateShaderTable(int32_t clientWidth, int32_t clientHeight);
 
 };

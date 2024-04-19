@@ -41,6 +41,9 @@ void DxrCommon::Init(WinApp* winApp, int32_t clientWidth, int32_t clientHeight) 
 	CreateShaderBlob();
 	CreateStateObject();
 	CreateResultBuffer(clientWidth, clientHeight);
+	CreateShaderTable(clientWidth, clientHeight);
+
+	Sent();
 }
 
 void DxrCommon::Term() {
@@ -49,6 +52,8 @@ void DxrCommon::Term() {
 	descriptorHeaps_.reset();
 	command_.reset();
 	devices_.reset();
+
+
 }
 
 void DxrCommon::BeginFrame() {
@@ -86,6 +91,66 @@ void DxrCommon::EndFrame() {
 		1,
 		swapChain_->GetTransitionBarrier(backBufferIndex_, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT)
 	);
+
+	command_->Close();
+
+	swapChain_->Present(1, 0);
+
+	// GPUにシグナルを送る
+	fence_->AddFenceValue();
+
+	command_->Signal(fence_.get());
+
+	fence_->WaitGPU();
+
+	command_->Reset();
+}
+
+void DxrCommon::DxrRender() {
+
+	backBufferIndex_ = swapChain_->GetSwapChain()->GetCurrentBackBufferIndex();
+
+	auto commandList = command_->GetCommandList();
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = {
+		descriptorHeaps_->GetDescriptorHeap(SRV)
+	};
+	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	commandList->SetComputeRootSignature(rootSignatureGlobal_.Get());
+
+	commandList->SetComputeRootDescriptorTable(0, tlasDescriptor_.handleGPU);
+	commandList->SetComputeRootDescriptorTable(1, outputDescriptor_.handleGPU);
+
+	// レイトレーシング結果バッファを UAV 状態へ.
+	auto barrierToUAV = CD3DX12_RESOURCE_BARRIER::Transition(
+		outputResource_.Get(),
+		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+	);
+	commandList->ResourceBarrier(1, &barrierToUAV);
+
+	// レイトレーシングを開始.
+	commandList->SetPipelineState1(stateObject_.Get());
+	commandList->DispatchRays(&dispatchRayDesc_);
+
+	// レイトレーシング結果をバックバッファへコピーする.
+	// バリアを設定し各リソースの状態を遷移させる.
+	D3D12_RESOURCE_BARRIER barriers[] = {
+		CD3DX12_RESOURCE_BARRIER::Transition(
+			outputResource_.Get(),
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+		CD3DX12_RESOURCE_BARRIER::Transition(
+			swapChain_->GetResource(backBufferIndex_),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST),
+	};
+	commandList->ResourceBarrier(_countof(barriers), barriers);
+	commandList->CopyResource(swapChain_->GetResource(backBufferIndex_), outputResource_.Get());
+
+	// Present 可能なようにバリアをセット.
+	auto barrierToPresent = CD3DX12_RESOURCE_BARRIER::Transition(
+		swapChain_->GetResource(backBufferIndex_),
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT
+	);
+	commandList->ResourceBarrier(1, &barrierToPresent);
 
 	command_->Close();
 
@@ -467,7 +532,7 @@ void DxrCommon::CreateResultBuffer(int32_t clientWidth, int32_t clientHeight) {
 	device->CreateUnorderedAccessView(outputResource_.Get(), nullptr, &uavDesc, outputDescriptor_.handleCPU);
 }
 
-void DxrCommon::CreateShaderTable() {
+void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 	auto device = devices_->GetDevice();
 
 	// 各シェーダーレコードは Shader Identifier を保持する.
@@ -500,7 +565,7 @@ void DxrCommon::CreateShaderTable() {
 	);
 
 	ComPtr<ID3D12StateObjectProperties> rtsoProps;
-	m_rtState.As(&rtsoProps);
+	stateObject_.As(&rtsoProps);
 
 	// 各シェーダーレコードを書き込んでいく.
 	void* mapped = nullptr;
@@ -513,7 +578,7 @@ void DxrCommon::CreateShaderTable() {
 		uint8_t* p = rgsStart;
 		auto id = rtsoProps->GetShaderIdentifier(kRayGenerationFunctionName_);
 		if (id == nullptr) {
-			throw std::logic_error("Not found ShaderIdentifier");
+			assert(false);
 		}
 		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -527,7 +592,7 @@ void DxrCommon::CreateShaderTable() {
 		uint8_t* p = missStart;
 		auto id = rtsoProps->GetShaderIdentifier(kMissFunctionName_);
 		if (id == nullptr) {
-			throw std::logic_error("Not found ShaderIdentifier");
+			assert(false);
 		}
 		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -541,7 +606,7 @@ void DxrCommon::CreateShaderTable() {
 		uint8_t* p = hitgroupStart;
 		auto id = rtsoProps->GetShaderIdentifier(kHitGroup_);
 		if (id == nullptr) {
-			throw std::logic_error("Not found ShaderIdentifier");
+			assert(false);
 		}
 		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
 		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -553,24 +618,24 @@ void DxrCommon::CreateShaderTable() {
 
 	// DispatchRays のために情報をセットしておく.
 	auto startAddress = shaderTable_->GetGPUVirtualAddress();
-	auto& shaderRecordRG = m_dispatchRayDesc.RayGenerationShaderRecord;
+	auto& shaderRecordRG = dispatchRayDesc_.RayGenerationShaderRecord;
 	shaderRecordRG.StartAddress = startAddress;
 	shaderRecordRG.SizeInBytes = raygenSize;
 	startAddress += raygenRegion;
 
-	auto& shaderRecordMS = m_dispatchRayDesc.MissShaderTable;
+	auto& shaderRecordMS = dispatchRayDesc_.MissShaderTable;
 	shaderRecordMS.StartAddress = startAddress;
 	shaderRecordMS.SizeInBytes = missSize;
 	shaderRecordMS.StrideInBytes = recordSize;
 	startAddress += missRegion;
 
-	auto& shaderRecordHG = m_dispatchRayDesc.HitGroupTable;
+	auto& shaderRecordHG = dispatchRayDesc_.HitGroupTable;
 	shaderRecordHG.StartAddress = startAddress;
 	shaderRecordHG.SizeInBytes = hitGroupSize;
 	shaderRecordHG.StrideInBytes = recordSize;
 	startAddress += hitgroupRegion;
 
-	m_dispatchRayDesc.Width = GetWidth();
-	m_dispatchRayDesc.Height = GetHeight();
-	m_dispatchRayDesc.Depth = 1;
+	dispatchRayDesc_.Width = clientWidth;
+	dispatchRayDesc_.Height = clientHeight;
+	dispatchRayDesc_.Depth = 1;
 }

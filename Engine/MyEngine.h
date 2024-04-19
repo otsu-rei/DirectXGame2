@@ -93,6 +93,8 @@ namespace DxrObject {
 	class Command;
 }
 
+class DxrCommon;
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 // DxrEnigine class
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +121,8 @@ public:
 	static DxrObject::Devices* GetDevicesObj();
 
 	static DxrObject::Command* GetCommandObj();
+
+	static DxrCommon* GetDxrCommon();
 
 private:
 };
