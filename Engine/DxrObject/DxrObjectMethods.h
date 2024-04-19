@@ -34,6 +34,15 @@ namespace DxrObjectMethod {
 		const D3D12_HEAP_PROPERTIES& prop
 	);
 
+	ComPtr<ID3D12Resource> CreateBufferResource(
+		ID3D12Device5* device,
+		uint64_t size,
+		D3D12_RESOURCE_FLAGS flag,
+		D3D12_RESOURCE_STATES initalizeState,
+		D3D12_HEAP_TYPE heapType,
+		const wchar_t* name
+	);
+
 	ComPtr<ID3D12RootSignature> CreateRootSignature(
 		ID3D12Device5* device,
 		const D3D12_ROOT_SIGNATURE_DESC& desc
@@ -48,6 +57,8 @@ namespace DxrObjectMethod {
 
 	void WriteToHostVisibleMemory(ID3D12Resource* resource, const void* pData, size_t dataSize);
 
+	void WriteToDefaultMemory(ID3D12Resource* resource, const void* pData, size_t dataSize);
+
 	ComPtr<ID3D12Resource> CreateTexture2D(
 		ID3D12Device5* device,
 		UINT width, UINT height,
@@ -58,5 +69,10 @@ namespace DxrObjectMethod {
 	);
 
 	UINT Alignment(size_t size, UINT align);
+
+	ComPtr<ID3D12Resource> CreateBuffer(
+		ID3D12Device5* device,
+		uint64_t size,
+	);
 
 }

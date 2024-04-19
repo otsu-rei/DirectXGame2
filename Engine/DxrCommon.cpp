@@ -639,3 +639,119 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 	dispatchRayDesc_.Height = clientHeight;
 	dispatchRayDesc_.Depth = 1;
 }
+
+void DxrCommon::CreateObject() {
+	auto device = devices_->GetDevice();
+
+	auto vstrider = sizeof(VertexData);
+	auto istrider = sizeof(UINT);
+
+	std::vector<VertexData> vertices;
+	std::vector<UINT>       indices;
+
+	Create::Plane(vertices, indices);
+
+	plane_.vertexBuffer = CreateBuffer(
+		vstrider * vertices.size(),
+		vertices.data(),
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_FLAG_NONE,
+		L"plane_.vertexBuffer"
+	);
+
+	plane_.indexBuffer = CreateBuffer(
+		istrider * indices.size(),
+		indices.data(),
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_FLAG_NONE,
+		L"plane_.indexBuffer"
+	);
+
+	plane_.vertexCount = UINT(vertices.size());
+	plane_.indexCount = UINT(indices.size());
+	plane_.vertexStrider = vstrider;
+
+}
+
+ComPtr<ID3D12Resource> DxrCommon::CreateBuffer(size_t size, const void* data, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_FLAGS flags, const wchar_t* name) {
+
+	auto device = devices_->GetDevice();
+
+	D3D12_RESOURCE_STATES initState = D3D12_RESOURCE_STATE_COPY_DEST;
+	if (heapType == D3D12_HEAP_TYPE_UPLOAD) {
+		initState = D3D12_RESOURCE_STATE_GENERIC_READ;
+	}
+
+	ComPtr<ID3D12Resource> result = CreateBufferResource(
+		device,
+		size,
+		flags,
+		initState,
+		heapType,
+		name
+	);
+
+	if (data != nullptr) {
+		if (heapType == D3D12_HEAP_TYPE_DEFAULT) {
+			ComPtr<ID3D12Resource> staging;
+			
+			D3D12_RESOURCE_DESC resDesc{};
+			resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			resDesc.Width = size;
+			resDesc.Height = 1;
+			resDesc.DepthOrArraySize = 1;
+			resDesc.MipLevels = 1;
+			resDesc.SampleDesc = { 1, 0 };
+			resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+			auto hr = device->CreateCommittedResource(
+				&kUploadHeapProps,
+				D3D12_HEAP_FLAG_NONE,
+				&resDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(staging.ReleaseAndGetAddressOf())
+			);
+			
+			assert(SUCCEEDED(hr));
+
+			WriteToHostVisibleMemory(staging.Get(), data, size);
+
+			auto command = command_->GetCommandList();
+			
+			command->CopyResource(result.Get(), staging.Get());
+			
+			Sent();
+
+		} else if (heapType == D3D12_HEAP_TYPE_UPLOAD) {
+			WriteToHostVisibleMemory(result.Get(), data, size);
+		}
+	}
+
+	return result;
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// Create namespace methods
+////////////////////////////////////////////////////////////////////////////////////////////
+void Create::Plane(std::vector<VertexData>& vertex, std::vector<UINT>& index) {
+	const Vector4f white = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+	VertexData srcVertexData[] = {
+		// position            // normal          // color
+		{{-1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f, 0.0f }, white },
+		{{-1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, white },
+		{{ 1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f, 0.0f }, white },
+		{{ 1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, white },
+	};
+
+	vertex.resize(4);
+
+	for (int i = 0; i < 4; ++i) {
+		vertex[i] = srcVertexData[i];
+	}
+
+	index = { 0, 1, 2, 2, 1, 3 };
+
+}

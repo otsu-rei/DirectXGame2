@@ -19,6 +19,9 @@
 #include <DxrSwapChain.h>
 #include <DxrFence.h>
 
+#include <Vector4.h>
+#include <Vector3.h>
+
 // directX
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -26,6 +29,7 @@
 
 // c++
 #include <cassert>
+#include <vector>
 
 #include <ComPtr.h>
 
@@ -37,11 +41,33 @@
 #pragma comment(lib, "dxcompiler.lib")
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-// PolygonObject structure
+// PolygonMesh structure
 ////////////////////////////////////////////////////////////////////////////////////////////
-struct PolygonObject {
-	
+struct PolygonMesh {
+	ComPtr<ID3D12Resource> vertexBuffer;
+	ComPtr<ID3D12Resource> indexBuffer;
+
+	DxrObject::Descriptor descriptorVB;
+	DxrObject::Descriptor descriptorIB;
+
+	UINT vertexCount = 0;
+	UINT indexCount = 0;
+	UINT vertexStrider = 0;
+
+	ComPtr<ID3D12Resource> blas;
+
+	std::wstring shaderName;
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// VertexData structure
+////////////////////////////////////////////////////////////////////////////////////////////
+struct VertexData {
+	Vector3f position;
+	Vector3f normal;
+	Vector4f color;
+};
+
 
 //-----------------------------------------------------------------------------------------
 // forward
@@ -70,8 +96,8 @@ public:
 	//! @brief 終了処理
 	void Term();
 
+	// default system
 	void BeginFrame();
-
 	void EndFrame();
 
 	void DxrRender(); //!< Test method
@@ -105,6 +131,9 @@ private:
 	ComPtr<ID3D12Resource> blas_;
 	ComPtr<ID3D12Resource> tlas_;
 	DxrObject::Descriptor tlasDescriptor_;
+
+	// objects
+	PolygonMesh plane_;
 
 	// global
 	ComPtr<ID3D12RootSignature> rootSignatureGlobal_;
@@ -147,4 +176,20 @@ private:
 
 	void CreateShaderTable(int32_t clientWidth, int32_t clientHeight);
 
+
+	/// new
+
+	void CreateObject();
+
+	ComPtr<ID3D12Resource> CreateBuffer(size_t size, const void* data, D3D12_HEAP_TYPE type, D3D12_RESOURCE_FLAGS flags, const wchar_t* name);
+
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// Create class
+////////////////////////////////////////////////////////////////////////////////////////////
+namespace Create {
+
+	void Plane(std::vector<VertexData>& vertex, std::vector<UINT>& index);
+
+}
