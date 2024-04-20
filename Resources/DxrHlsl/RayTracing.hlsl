@@ -56,7 +56,7 @@ float3 Reflection(float3 vertexPos, float3 vertexNormal, float3 vertexColor, int
 		reflectPayload
 	);
 	
-	float3 result = reflectPayload.color * 0.8f + vertexColor * 0.2f;
+	float3 result = reflectPayload.color * 0.9f + vertexColor * 0.1f;
 	
 	return result;
 	
