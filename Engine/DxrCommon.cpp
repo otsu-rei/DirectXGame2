@@ -639,7 +639,7 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 		uint8_t* p = missStart;
 		auto id = rtsoProps->GetShaderIdentifier(L"mainMS");
 		if (id == nullptr) {
-			throw std::logic_error("Not found ShaderIdentifier");
+			assert(false);
 		}
 		p += WriteShaderIdentifier(p, id);
 
@@ -983,7 +983,7 @@ void DxrCommon::CreateLoaclRootSignatureColosestHit() {
 	rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 
 	modelRootSignature_ = CreateRootSignature(devices_->GetDevice(), rootSigDesc);
-	modelRootSignature_->SetName(L"lrsModel");
+	modelRootSignature_->SetName(L"model");
 }
 
 //=========================================================================================
