@@ -175,3 +175,8 @@ ComPtr<ID3D12Resource> DxrObjectMethod::CreateTexture2D(
 UINT DxrObjectMethod::Alignment(size_t size, UINT align) {
 	return UINT(size + align - 1) & ~(align - 1);
 }
+
+UINT DxrObjectMethod::WriteShaderIdentifier(void* dst, const void* shaderId) {
+	memcpy(dst, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+	return D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+}

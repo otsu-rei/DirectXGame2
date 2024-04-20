@@ -68,6 +68,6 @@ namespace DxrObjectMethod {
 
 	UINT Alignment(size_t size, UINT align);
 
-	
+	UINT WriteShaderIdentifier(void* dst, const void* shaderId);
 
 }

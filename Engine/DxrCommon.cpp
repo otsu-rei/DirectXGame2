@@ -35,18 +35,31 @@ void DxrCommon::Init(WinApp* winApp, int32_t clientWidth, int32_t clientHeight) 
 	);
 	fence_           = std::make_unique<Fence>(devices_.get());
 
-	CreateBLAS();
+	/*CreateBLAS();
 	CreateTLAS();
 	CreateRootSignatureGlobal();
 	CreateShaderBlob();
 	CreateStateObject();
 	CreateResultBuffer(clientWidth, clientHeight);
-	CreateShaderTable(clientWidth, clientHeight);
+	CreateShaderTable(clientWidth, clientHeight);*/
 
+	CreateObject();
+	CreateSceneBLAS();
+	CreateSceneTLAS();
+	CreateGlobalRootSignature();
+	CreateLoaclRootSignatureRayGen();
+	CreateLoaclRootSignatureColosestHit();
+	CreateShaderBlob();
+	CreateStateObject();
+	CreateResultBuffer(clientWidth, clientHeight);
+	CreateShaderTable(clientWidth, clientHeight);
+	
 	Sent();
 }
 
 void DxrCommon::Term() {
+
+
 	fence_.reset();
 	swapChain_.reset();
 	descriptorHeaps_.reset();
@@ -119,7 +132,6 @@ void DxrCommon::DxrRender() {
 	commandList->SetComputeRootSignature(rootSignatureGlobal_.Get());
 
 	commandList->SetComputeRootDescriptorTable(0, tlasDescriptor_.handleGPU);
-	commandList->SetComputeRootDescriptorTable(1, outputDescriptor_.handleGPU);
 
 	// レイトレーシング結果バッファを UAV 状態へ.
 	auto barrierToUAV = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -488,12 +500,34 @@ void DxrCommon::CreateStateObject() {
 	auto shaderConfig
 		= stateObjectDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
 
-	uint32_t payloadSize = static_cast<uint32_t>(sizeof(Vector3f));
+	uint32_t payloadSize = static_cast<uint32_t>(sizeof(Vector3f)) + static_cast<uint32_t>(sizeof(uint32_t));
 	uint32_t attributeSize = static_cast<uint32_t>(sizeof(Vector2f));
 
 	shaderConfig->Config(payloadSize, attributeSize);
 
 	// localがないので飛ばしとく error出たらここが原因かも
+	auto localRootSignature
+		= stateObjectDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+
+	localRootSignature->SetRootSignature(modelRootSignature_.Get());
+
+	auto assoc
+		= stateObjectDesc.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+
+	assoc->AddExport(kHitGroup_);
+	assoc->SetSubobjectToAssociate(localRootSignature->operator const D3D12_STATE_SUBOBJECT &());
+
+	auto rayGen
+		= stateObjectDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+
+	rayGen->SetRootSignature(rayGenRootSignature_.Get());
+
+	auto rayGenSubObject
+		= stateObjectDesc.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+
+	rayGenSubObject->AddExport(kRayGenerationFunctionName_);
+	rayGenSubObject->SetSubobjectToAssociate(rayGen->operator const D3D12_STATE_SUBOBJECT &());
+
 
 	auto grobalRootSignatureSubobject
 		= stateObjectDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
@@ -503,7 +537,7 @@ void DxrCommon::CreateStateObject() {
 	auto pipelineConfigSubobject
 		= stateObjectDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
 
-	uint32_t maxRecursionDepth = 1; //!< Max31
+	uint32_t maxRecursionDepth = 16; //!< Max31
 
 	pipelineConfigSubobject->Config(maxRecursionDepth);
 
@@ -533,36 +567,48 @@ void DxrCommon::CreateResultBuffer(int32_t clientWidth, int32_t clientHeight) {
 }
 
 void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
-	auto device = devices_->GetDevice();
+	const auto ShaderRecordAlignment = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+	// RayGeneration シェーダーでは、 Shader Identifier と
+	// ローカルルートシグネチャによる u0 のディスクリプタを使用.
+	UINT raygenRecordSize = 0;
+	raygenRecordSize += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	raygenRecordSize += sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
+	raygenRecordSize = Alignment(raygenRecordSize, ShaderRecordAlignment);
 
-	// 各シェーダーレコードは Shader Identifier を保持する.
-	UINT recordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	// ヒットグループでは、 Shader Identifier の他に
+	// ローカルルートシグネチャによる VB/IB のディスクリプタを使用.
+	UINT hitgroupRecordSize = 0;
+	hitgroupRecordSize += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	hitgroupRecordSize += sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
+	hitgroupRecordSize += sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
+	hitgroupRecordSize = Alignment(hitgroupRecordSize, ShaderRecordAlignment);
 
-	// グローバルのルートシグネチャ以外の情報を持たないのでレコードサイズはこれだけ.
+	// Missシェーダーではローカルルートシグネチャ未使用.
+	UINT missRecordSize = 0;
+	missRecordSize += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	missRecordSize = Alignment(missRecordSize, ShaderRecordAlignment);
 
-	// あとはアライメント制約を保つようにする.
-	recordSize = Alignment(recordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-
-	// シェーダーテーブルのサイズを求める.
-	UINT raygenSize = 1 * recordSize;   // 今1つの Ray Generation シェーダー.
-	UINT missSize = 1 * recordSize;     // 今1つの Miss シェーダー.
-	UINT hitGroupSize = 1 * recordSize; // 今1つの HitGroup を使用.
+	// 使用する各シェーダーの個数より、シェーダーテーブルのサイズを求める.
+	//  RayGen : 1
+	//  Miss : 1
+	//  HitGroup: 1 (オブジェクトは3つ描画するがヒットグループは2つで処理する).
+	UINT hitgroupCount = 1;
+	UINT raygenSize = 1 * raygenRecordSize;
+	UINT missSize = 1 * missRecordSize;
+	UINT hitGroupSize = hitgroupCount * hitgroupRecordSize;
 
 	// 各テーブルの開始位置にアライメント制約があるので調整する.
 	auto tableAlign = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
-	UINT raygenRegion = Alignment(raygenSize, tableAlign);
-	UINT missRegion = Alignment(missSize, tableAlign);
-	UINT hitgroupRegion = Alignment(hitGroupSize, tableAlign);
+	auto raygenRegion = Alignment(raygenSize, tableAlign);
+	auto missRegion = Alignment(missSize, tableAlign);
+	auto hitgroupRegion = Alignment(hitGroupSize, tableAlign);
 
 	// シェーダーテーブル確保.
 	auto tableSize = raygenRegion + missRegion + hitgroupRegion;
-	shaderTable_ = CreateBufferResource(
-		device,
-		tableSize,
-		D3D12_RESOURCE_FLAG_NONE,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		kUploadHeapProps
-	);
+	shaderTable_ = CreateBuffer(
+		tableSize, nullptr,
+		D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_FLAG_NONE,
+		L"ShaderTable");
 
 	ComPtr<ID3D12StateObjectProperties> rtsoProps;
 	stateObject_.As(&rtsoProps);
@@ -576,26 +622,26 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 	auto rgsStart = pStart;
 	{
 		uint8_t* p = rgsStart;
-		auto id = rtsoProps->GetShaderIdentifier(kRayGenerationFunctionName_);
+		auto id = rtsoProps->GetShaderIdentifier(L"mainRayGen");
 		if (id == nullptr) {
 			assert(false);
 		}
-		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		p += WriteShaderIdentifier(p, id);
 
-		// ローカルルートシグネチャ使用時には他のデータを書き込む.
+		// ローカルルートシグネチャで u0 (出力先) を設定しているため
+		// 対応するディスクリプタを書き込む.
+		p += WriteGPUDescriptor(p, outputDescriptor_);
 	}
 
 	// Miss Shader 用のシェーダーレコードを書き込み.
 	auto missStart = pStart + raygenRegion;
 	{
 		uint8_t* p = missStart;
-		auto id = rtsoProps->GetShaderIdentifier(kMissFunctionName_);
+		auto id = rtsoProps->GetShaderIdentifier(L"mainMS");
 		if (id == nullptr) {
-			assert(false);
+			throw std::logic_error("Not found ShaderIdentifier");
 		}
-		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		p += WriteShaderIdentifier(p, id);
 
 		// ローカルルートシグネチャ使用時には他のデータを書き込む.
 	}
@@ -603,21 +649,20 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 	// Hit Group 用のシェーダーレコードを書き込み.
 	auto hitgroupStart = pStart + raygenRegion + missRegion;
 	{
-		uint8_t* p = hitgroupStart;
-		auto id = rtsoProps->GetShaderIdentifier(kHitGroup_);
-		if (id == nullptr) {
-			assert(false);
-		}
-		memcpy(p, id, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
-		p += D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+		uint8_t* pRecord = hitgroupStart;
 
-		// ローカルルートシグネチャ使用時には他のデータを書き込む.
+		// plane に対応するシェーダーレコードを書き込む.
+		pRecord = WriteShaderRecord(pRecord, plane_, hitgroupRecordSize);
+
+		// cube に対応するシェーダーレコードを書き込む.
+		pRecord = WriteShaderRecord(pRecord, cube_, hitgroupRecordSize);
 	}
 
 	shaderTable_->Unmap(0, nullptr);
 
 	// DispatchRays のために情報をセットしておく.
 	auto startAddress = shaderTable_->GetGPUVirtualAddress();
+
 	auto& shaderRecordRG = dispatchRayDesc_.RayGenerationShaderRecord;
 	shaderRecordRG.StartAddress = startAddress;
 	shaderRecordRG.SizeInBytes = raygenSize;
@@ -626,13 +671,13 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 	auto& shaderRecordMS = dispatchRayDesc_.MissShaderTable;
 	shaderRecordMS.StartAddress = startAddress;
 	shaderRecordMS.SizeInBytes = missSize;
-	shaderRecordMS.StrideInBytes = recordSize;
+	shaderRecordMS.StrideInBytes = missRecordSize;
 	startAddress += missRegion;
 
 	auto& shaderRecordHG = dispatchRayDesc_.HitGroupTable;
 	shaderRecordHG.StartAddress = startAddress;
 	shaderRecordHG.SizeInBytes = hitGroupSize;
-	shaderRecordHG.StrideInBytes = recordSize;
+	shaderRecordHG.StrideInBytes = hitgroupRecordSize;
 	startAddress += hitgroupRegion;
 
 	dispatchRayDesc_.Width = clientWidth;
@@ -642,16 +687,17 @@ void DxrCommon::CreateShaderTable(int32_t clientWidth, int32_t clientHeight) {
 
 void DxrCommon::CreateObject() {
 
-	auto vstrider = UINT(sizeof(VertexData));
-	auto istrider = UINT(sizeof(UINT));
+	auto vstride = UINT(sizeof(VertexDataDXR));
+	auto istride = UINT(sizeof(UINT));
 
-	std::vector<VertexData> vertices;
-	std::vector<UINT>       indices;
+	std::vector<VertexDataDXR> vertices;
+	std::vector<UINT>          indices;
 
+	// plane
 	Create::Plane(vertices, indices);
 
 	plane_.vertexBuffer = CreateBuffer(
-		vstrider * vertices.size(),
+		vstride * vertices.size(),
 		vertices.data(),
 		D3D12_HEAP_TYPE_DEFAULT,
 		D3D12_RESOURCE_FLAG_NONE,
@@ -659,7 +705,7 @@ void DxrCommon::CreateObject() {
 	);
 
 	plane_.indexBuffer = CreateBuffer(
-		istrider * indices.size(),
+		istride * indices.size(),
 		indices.data(),
 		D3D12_HEAP_TYPE_DEFAULT,
 		D3D12_RESOURCE_FLAG_NONE,
@@ -668,9 +714,281 @@ void DxrCommon::CreateObject() {
 
 	plane_.vertexCount = UINT(vertices.size());
 	plane_.indexCount = UINT(indices.size());
-	plane_.vertexStrider = vstrider;
+	plane_.vertexStride = vstride;
+
+	plane_.descriptorVB = CreateStructuredSRV(
+		plane_.vertexBuffer.Get(),
+		plane_.vertexCount,
+		0, vstride
+	);
+
+	plane_.descriptorIB = CreateStructuredSRV(
+		plane_.indexBuffer.Get(),
+		plane_.indexCount,
+		0, istride
+	);
+
+	plane_.shaderName = kHitGroup_;
+
+	// cube
+
+	vertices.clear();
+	indices.clear();
+
+	Create::Cube(vertices, indices);
+
+	cube_.vertexBuffer = CreateBuffer(
+		vstride * vertices.size(),
+		vertices.data(),
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_FLAG_NONE,
+		L"cube_.vertexBuffer"
+	);
+
+	cube_.indexBuffer = CreateBuffer(
+		istride * indices.size(),
+		indices.data(),
+		D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_FLAG_NONE,
+		L"cube_.indexBuffer"
+	);
+
+	cube_.vertexCount = UINT(vertices.size());
+	cube_.indexCount = UINT(indices.size());
+	cube_.vertexStride = vstride;
+
+	cube_.descriptorVB = CreateStructuredSRV(
+		cube_.vertexBuffer.Get(),
+		cube_.vertexCount,
+		0, vstride
+	);
+
+	cube_.descriptorIB = CreateStructuredSRV(
+		cube_.indexBuffer.Get(),
+		cube_.indexCount,
+		0, istride
+	);
+
+	cube_.shaderName = kHitGroup_;
+
+	vertices.clear();
+	indices.clear();
 
 }
+
+void DxrCommon::CreateSceneBLAS() {
+	auto planeGeometryDesc = GetGeometryDesc(plane_);
+	auto cubeGeometryDesc = GetGeometryDesc(cube_);
+
+	// BLASの作成
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs = asDesc.Inputs;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+
+	// BLAS を構築するためのバッファを準備 (Plane).
+	inputs.NumDescs = 1;
+	inputs.pGeometryDescs = &planeGeometryDesc;
+	auto planeASB = CreateAccelerationStructure(asDesc);
+	planeASB.asbuffer->SetName(L"Plane-Blas");
+	asDesc.ScratchAccelerationStructureData = planeASB.scratch->GetGPUVirtualAddress();
+	asDesc.DestAccelerationStructureData = planeASB.asbuffer->GetGPUVirtualAddress();
+
+	// コマンドリストに積む.
+	auto command = command_->GetCommandList();
+	command->BuildRaytracingAccelerationStructure(
+		&asDesc, 0, nullptr);
+
+	// BLAS を構築するためのバッファを準備 (Cube).
+	inputs.NumDescs = 1;
+	inputs.pGeometryDescs = &cubeGeometryDesc;
+	auto cubeASB = CreateAccelerationStructure(asDesc);
+	cubeASB.asbuffer->SetName(L"Cube-Blas");
+	asDesc.ScratchAccelerationStructureData = cubeASB.scratch->GetGPUVirtualAddress();
+	asDesc.DestAccelerationStructureData = cubeASB.asbuffer->GetGPUVirtualAddress();
+
+	// コマンドリストに積む.
+	command->BuildRaytracingAccelerationStructure(
+		&asDesc, 0, nullptr);
+
+	// Plane,Cube それぞれの BLAS についてバリアを設定する.
+	D3D12_RESOURCE_BARRIER uavBarriers[] = {
+		CD3DX12_RESOURCE_BARRIER::UAV(planeASB.asbuffer.Get()),
+		CD3DX12_RESOURCE_BARRIER::UAV(cubeASB.asbuffer.Get()),
+	};
+	command->ResourceBarrier(_countof(uavBarriers), uavBarriers);
+	
+	Sent();
+
+	// この先は BLAS のバッファのみ使うのでメンバ変数に代入しておく.
+	plane_.blas = planeASB.asbuffer;
+	cube_.blas = cubeASB.asbuffer;
+}
+
+void DxrCommon::CreateSceneTLAS() {
+
+	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
+	DeployObjects(instanceDescs);
+
+	// インスタンスの情報を記録したバッファを準備する.
+	size_t sizeOfInstanceDescs = instanceDescs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
+	auto instanceDescBuffer = CreateBuffer(
+		sizeOfInstanceDescs,
+		instanceDescs.data(),
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_RESOURCE_FLAG_NONE,
+		L"InstanceDescBuffer"
+	);
+
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc{};
+	auto& inputs = asDesc.Inputs;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+
+	inputs.NumDescs = UINT(instanceDescs.size());
+	inputs.InstanceDescs = instanceDescBuffer->GetGPUVirtualAddress();
+
+	auto sceneASB = CreateAccelerationStructure(asDesc);
+	sceneASB.asbuffer->SetName(L"Scene-Tlas");
+	asDesc.ScratchAccelerationStructureData = sceneASB.scratch->GetGPUVirtualAddress();
+	asDesc.DestAccelerationStructureData = sceneASB.asbuffer->GetGPUVirtualAddress();
+
+	// コマンドリストに積む.
+	auto command = command_->GetCommandList();
+	command->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+
+	// TLAS に対しての UAV バリアを設定.
+	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(
+		sceneASB.asbuffer.Get()
+	);
+	Sent();
+
+	// この先は TLAS のバッファのみ使うのでメンバ変数に代入しておく.
+	tlas_ = sceneASB.asbuffer;
+
+	// ディスクリプタの準備.
+	tlasDescriptor_ = descriptorHeaps_->GetCurrentDescriptor(SRV);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.RaytracingAccelerationStructure.Location = tlas_->GetGPUVirtualAddress();
+
+	devices_->GetDevice()->CreateShaderResourceView(
+		nullptr, &srvDesc, tlasDescriptor_.handleCPU
+	);
+
+}
+
+void DxrCommon::DeployObjects(std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& instanceDescs) {
+
+	D3D12_RAYTRACING_INSTANCE_DESC baseDesc = {};
+	baseDesc.InstanceMask = 0xFF;
+	baseDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+
+	// シーンに床, Cube 2つを設置する.
+	instanceDescs.resize(2);
+	auto& floor = instanceDescs[0];
+	auto& cube = instanceDescs[1];
+
+	
+	floor = baseDesc;
+	Matrix4x4 mat = Matrix::MakeAffine(unitVector, {0.0f, 1.0f, 0.0f}, {2.0f, 0.0f, 1.0f});
+	mat = Matrix::Transpose(mat);
+	memcpy(floor.Transform, &mat, sizeof(baseDesc.Transform));
+	floor.InstanceContributionToHitGroupIndex = 0;
+	floor.InstanceID = 1;
+	floor.AccelerationStructure = plane_.blas->GetGPUVirtualAddress();
+
+	cube = baseDesc;
+	Matrix4x4 cubeMat = Matrix::MakeAffine({0.5f, 0.5f, 0.5f}, {0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 0.5f});
+	cubeMat = Matrix::Transpose(cubeMat);
+	memcpy(cube.Transform, &cubeMat, sizeof(baseDesc.Transform));
+	cube.InstanceContributionToHitGroupIndex = 1;
+	cube.InstanceID = 0;
+	cube.AccelerationStructure = cube_.blas->GetGPUVirtualAddress();
+
+}
+
+void DxrCommon::CreateGlobalRootSignature() {
+	std::array<CD3DX12_ROOT_PARAMETER, 1> rootParams;
+
+	// TLAS を t0 レジスタに割り当てて使用する設定.
+	CD3DX12_DESCRIPTOR_RANGE descRangeTLAS;
+	descRangeTLAS.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+	rootParams[0].InitAsDescriptorTable(1, &descRangeTLAS);
+
+	D3D12_ROOT_SIGNATURE_DESC rootSigDesc{};
+	rootSigDesc.NumParameters = UINT(rootParams.size());
+	rootSigDesc.pParameters = rootParams.data();
+
+	rootSignatureGlobal_ = CreateRootSignature(devices_->GetDevice(), rootSigDesc);
+	rootSignatureGlobal_->SetName(L"RootSignatureGlobal");
+}
+
+void DxrCommon::CreateLoaclRootSignatureRayGen() {
+	// UAV (u0)
+	D3D12_DESCRIPTOR_RANGE descUAV = {};
+	descUAV.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	descUAV.BaseShaderRegister = 0;
+	descUAV.NumDescriptors = 1;
+
+	std::array<D3D12_ROOT_PARAMETER, 1> rootParams;
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &descUAV;
+
+	ComPtr<ID3DBlob> blob, errBlob;
+	D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+	rootSigDesc.NumParameters = UINT(rootParams.size());
+	rootSigDesc.pParameters = rootParams.data();
+	rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	rayGenRootSignature_ = CreateRootSignature(devices_->GetDevice(), rootSigDesc);
+	rayGenRootSignature_->SetName(L"rayGenRootSignature_");
+}
+
+void DxrCommon::CreateLoaclRootSignatureColosestHit() {
+	// 頂点・インデックスバッファにアクセスするためのローカルルートシグネチャを作る.
+	D3D12_DESCRIPTOR_RANGE rangeIB = {};
+	rangeIB.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	rangeIB.BaseShaderRegister = 0;
+	rangeIB.NumDescriptors = 1;
+	rangeIB.RegisterSpace = 1;
+
+	D3D12_DESCRIPTOR_RANGE rangeVB = {};
+	rangeVB.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	rangeVB.BaseShaderRegister = 1;
+	rangeVB.NumDescriptors = 1;
+	rangeVB.RegisterSpace = 1;
+
+
+	std::array<D3D12_ROOT_PARAMETER, 2> rootParams;
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &rangeIB;
+
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[1].DescriptorTable.pDescriptorRanges = &rangeVB;
+
+	D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+	rootSigDesc.NumParameters = UINT(rootParams.size());
+	rootSigDesc.pParameters = rootParams.data();
+	rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+
+	modelRootSignature_ = CreateRootSignature(devices_->GetDevice(), rootSigDesc);
+	modelRootSignature_->SetName(L"lrsModel");
+}
+
+//=========================================================================================
+// create methods
+//=========================================================================================
 
 ComPtr<ID3D12Resource> DxrCommon::CreateBuffer(size_t size, const void* data, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_FLAGS flags, const wchar_t* name) {
 
@@ -731,18 +1049,165 @@ ComPtr<ID3D12Resource> DxrCommon::CreateBuffer(size_t size, const void* data, D3
 
 }
 
+ComPtr<ID3D12Resource> DxrCommon::CreateBuffer(
+	size_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState, D3D12_HEAP_TYPE heapType, const wchar_t* name) {
+
+	D3D12_HEAP_PROPERTIES prop = {};
+	if (heapType == D3D12_HEAP_TYPE_DEFAULT) {
+		prop = kDefaultHeapProps;
+	}
+	if (heapType == D3D12_HEAP_TYPE_UPLOAD) {
+		prop = kUploadHeapProps;
+	}
+
+	ComPtr<ID3D12Resource> result;
+
+	D3D12_RESOURCE_DESC desc = {};
+	desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	desc.Alignment = 0;
+	desc.Width = size;
+	desc.Height = 1;
+	desc.DepthOrArraySize = 1;
+	desc.MipLevels = 1;
+	desc.Format = DXGI_FORMAT_UNKNOWN;
+	desc.SampleDesc = { 1, 0 };
+	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	desc.Flags = flags;
+
+	auto hr = devices_->GetDevice()->CreateCommittedResource(
+		&prop,
+		D3D12_HEAP_FLAG_NONE,
+		&desc,
+		initialState,
+		nullptr,
+		IID_PPV_ARGS(&result)
+	);
+	
+	assert(SUCCEEDED(hr));
+
+	if (result != nullptr && name != nullptr) {
+		result->SetName(name);
+	}
+
+	return result;
+
+}
+
+DxrObject::Descriptor DxrCommon::CreateStructuredSRV(ID3D12Resource* resource, UINT numElements, UINT firstElement, UINT stride) {
+	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+	desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	desc.Format = DXGI_FORMAT_UNKNOWN;
+	desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	desc.Buffer.NumElements = numElements;
+	desc.Buffer.FirstElement = firstElement;
+	desc.Buffer.StructureByteStride = stride;
+	
+	Descriptor result = descriptorHeaps_->GetCurrentDescriptor(SRV);
+
+	devices_->GetDevice()->CreateShaderResourceView(
+		resource,
+		&desc,
+		result.handleCPU
+	);
+
+	return result;
+
+}
+
+D3D12_RAYTRACING_GEOMETRY_DESC DxrCommon::GetGeometryDesc(const PolygonMesh& mesh) {
+	D3D12_RAYTRACING_GEOMETRY_DESC desc = {};
+	desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	auto& triangles = desc.Triangles;
+	triangles.VertexBuffer.StartAddress = mesh.vertexBuffer->GetGPUVirtualAddress();
+	triangles.VertexBuffer.StrideInBytes = mesh.vertexStride;
+	triangles.VertexCount = mesh.vertexCount;
+	triangles.IndexBuffer = mesh.indexBuffer->GetGPUVirtualAddress();
+	triangles.IndexCount = mesh.indexCount;
+	triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+	return desc;
+}
+
+AccelerationStructureBuffers DxrCommon::CreateAccelerationStructure(
+	const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& desc) {
+
+	auto device = devices_->GetDevice();
+	
+	AccelerationStructureBuffers buffer = {};
+	// 必要なメモリ数を求める
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
+	device->GetRaytracingAccelerationStructurePrebuildInfo(
+		&desc.Inputs, &info
+	);
+
+	// スクラッチバッファを確保
+	buffer.scratch = CreateBuffer(
+		info.ResultDataMaxSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_HEAP_TYPE_DEFAULT
+	);
+
+	buffer.asbuffer = CreateBuffer(
+		info.ResultDataMaxSizeInBytes,
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+		D3D12_HEAP_TYPE_DEFAULT
+	);
+
+	assert(buffer.asbuffer != nullptr || buffer.scratch != nullptr);
+
+	// アップデート用バッファを確保.
+	if (desc.Inputs.Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) {
+		buffer.update = CreateBuffer(
+			info.UpdateScratchDataSizeInBytes,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			D3D12_HEAP_TYPE_DEFAULT
+		);
+		assert(buffer.update != nullptr);
+	}
+
+	return buffer;
+
+}
+
+uint8_t* DxrCommon::WriteShaderRecord(uint8_t* dst, const PolygonMesh& mesh, UINT recordSize) {
+	ComPtr<ID3D12StateObjectProperties> rtsoProps;
+	stateObject_.As(&rtsoProps);
+	auto entryBegin = dst;
+	auto shader = mesh.shaderName;
+	auto id = rtsoProps->GetShaderIdentifier(shader.c_str());
+	if (id == nullptr) {
+		assert(false);
+	}
+
+	dst += WriteShaderIdentifier(dst, id);
+	// 今回のプログラムでは以下の順序でディスクリプタを記録.
+	// [0] : インデックスバッファ
+	// [1] : 頂点バッファ
+	// ※ ローカルルートシグネチャの順序に合わせる必要がある.
+	dst += WriteGPUDescriptor(dst, mesh.descriptorIB);
+	dst += WriteGPUDescriptor(dst, mesh.descriptorVB);
+
+	dst = entryBegin + recordSize;
+	return dst;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Create namespace methods
 ////////////////////////////////////////////////////////////////////////////////////////////
-void Create::Plane(std::vector<VertexData>& vertex, std::vector<UINT>& index) {
+void Create::Plane(std::vector<VertexDataDXR>& vertex, std::vector<UINT>& index) {
 	const Vector4f white = { 1.0f, 1.0f, 1.0f, 1.0f };
+	const Vector4f cyan   = { 0.8f, 1.0f, 1.0f, 1.0f };
 
-	VertexData srcVertexData[] = {
+	VertexDataDXR srcVertexData[] = {
 		// position            // normal          // color
-		{{-1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f, 0.0f }, white },
-		{{-1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, white },
-		{{ 1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f, 0.0f }, white },
-		{{ 1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, white },
+		{{-1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, cyan },
+		{{-1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, white },
+		{{ 1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, cyan },
+		{{ 1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, white },
 	};
 
 	vertex.resize(4);
@@ -752,5 +1217,62 @@ void Create::Plane(std::vector<VertexData>& vertex, std::vector<UINT>& index) {
 	}
 
 	index = { 0, 1, 2, 2, 1, 3 };
+
+}
+
+void Create::Cube(std::vector<VertexDataDXR>& vertex, std::vector<UINT>& index) {
+
+	vertex.clear();
+	index.clear();
+
+	const Vector4f red = { 1.0f, 0.0f, 0.0f, 1.0f };
+	const Vector4f green = { 0.0f, 1.0f, 0.0f, 1.0f };
+	const Vector4f blue = { 0.0f, 0.0f, 1.0f, 1.0f };
+	const Vector4f white = { 1.0f, 1.0f, 1.0f, 1.0f };
+	const Vector4f black = { 0.0f, 0.0f, 0.0f, 1.0f };
+	const Vector4f yellow = { 1.0f, 1.0f, 0.0f, 1.0f };
+	const Vector4f magenta = { 1.0f, 0.0f, 1.0f, 1.0f };
+	const Vector4f cyan = { 0.0f, 1.0f, 1.0f, 1.0f };
+
+	vertex = {
+		// 裏
+		{ {-1.0f,-1.0f,-1.0f}, { 0.0f, 0.0f, -1.0f }, red },
+		{ {-1.0f, 1.0f,-1.0f}, { 0.0f, 0.0f, -1.0f }, yellow },
+		{ { 1.0f, 1.0f,-1.0f}, { 0.0f, 0.0f, -1.0f }, white },
+		{ { 1.0f,-1.0f,-1.0f}, { 0.0f, 0.0f, -1.0f }, magenta },
+		// 右
+		{ { 1.0f,-1.0f,-1.0f}, { 1.0f, 0.0f, 0.0f }, magenta },
+		{ { 1.0f, 1.0f,-1.0f}, { 1.0f, 0.0f, 0.0f }, white},
+		{ { 1.0f, 1.0f, 1.0f}, { 1.0f, 0.0f, 0.0f }, cyan},
+		{ { 1.0f,-1.0f, 1.0f}, { 1.0f, 0.0f, 0.0f }, blue},
+		// 左
+		{ {-1.0f,-1.0f, 1.0f}, { -1.0f, 0.0f, 0.0f }, black},
+		{ {-1.0f, 1.0f, 1.0f}, { -1.0f, 0.0f, 0.0f }, green},
+		{ {-1.0f, 1.0f,-1.0f}, { -1.0f, 0.0f, 0.0f }, yellow},
+		{ {-1.0f,-1.0f,-1.0f}, { -1.0f, 0.0f, 0.0f }, red},
+		// 正面
+		{ { 1.0f,-1.0f, 1.0f}, { 0.0f, 0.0f, 1.0f}, blue},
+		{ { 1.0f, 1.0f, 1.0f}, { 0.0f, 0.0f, 1.0f}, cyan},
+		{ {-1.0f, 1.0f, 1.0f}, { 0.0f, 0.0f, 1.0f}, green},
+		{ {-1.0f,-1.0f, 1.0f}, { 0.0f, 0.0f, 1.0f}, black},
+		// 上
+		{ {-1.0f, 1.0f,-1.0f}, { 0.0f, 1.0f, 0.0f}, yellow},
+		{ {-1.0f, 1.0f, 1.0f}, { 0.0f, 1.0f, 0.0f}, green },
+		{ { 1.0f, 1.0f, 1.0f}, { 0.0f, 1.0f, 0.0f}, cyan },
+		{ { 1.0f, 1.0f,-1.0f}, { 0.0f, 1.0f, 0.0f}, white},
+		// 底
+		{ {-1.0f,-1.0f, 1.0f}, { 0.0f, -1.0f, 0.0f}, black},
+		{ {-1.0f,-1.0f,-1.0f}, { 0.0f, -1.0f, 0.0f}, red},
+		{ { 1.0f,-1.0f,-1.0f}, { 0.0f, -1.0f, 0.0f}, magenta},
+		{ { 1.0f,-1.0f, 1.0f}, { 0.0f, -1.0f, 0.0f}, blue},
+	};
+	index = {
+		0, 1, 2, 2, 3,0,
+		4, 5, 6, 6, 7,4,
+		8, 9, 10, 10, 11, 8,
+		12,13,14, 14,15,12,
+		16,17,18, 18,19,16,
+		20,21,22, 22,23,20,
+	};
 
 }

@@ -54,7 +54,7 @@ struct PolygonMesh {
 
 	UINT vertexCount = 0;
 	UINT indexCount = 0;
-	UINT vertexStrider = 0;
+	UINT vertexStride = 0;
 
 	ComPtr<ID3D12Resource> blas;
 
@@ -62,12 +62,21 @@ struct PolygonMesh {
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-// VertexData structure
+// Vertex structure
 ////////////////////////////////////////////////////////////////////////////////////////////
-struct VertexData {
+struct VertexDataDXR {
 	Vector3f position;
 	Vector3f normal;
 	Vector4f color;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// AccelerationStructureBuffers structure
+////////////////////////////////////////////////////////////////////////////////////////////
+struct AccelerationStructureBuffers {
+	ComPtr<ID3D12Resource> scratch;
+	ComPtr<ID3D12Resource> asbuffer;
+	ComPtr<ID3D12Resource> update;
 };
 
 
@@ -136,9 +145,14 @@ private:
 
 	// objects
 	PolygonMesh plane_;
+	PolygonMesh cube_;
 
 	// global
 	ComPtr<ID3D12RootSignature> rootSignatureGlobal_;
+
+	// loacl
+	ComPtr<ID3D12RootSignature> rayGenRootSignature_;
+	ComPtr<ID3D12RootSignature> modelRootSignature_;
 
 	// shader
 	static const LPCWSTR kShaderModel_;
@@ -183,9 +197,45 @@ private:
 
 	void CreateObject();
 
-	ComPtr<ID3D12Resource> CreateBuffer(size_t size, const void* data, D3D12_HEAP_TYPE type, D3D12_RESOURCE_FLAGS flags, const wchar_t* name);
+	void CreateSceneBLAS();
 
-	DxrObject::Descriptor CreateStructuredSRV();
+	void CreateSceneTLAS();
+
+	void DeployObjects(std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& instanceDescs);
+
+	void CreateGlobalRootSignature();
+
+	void CreateLoaclRootSignatureRayGen();
+
+	void CreateLoaclRootSignatureColosestHit();
+
+	//=========================================================================================
+	// create methods
+	//=========================================================================================
+
+	ComPtr<ID3D12Resource> CreateBuffer(
+		size_t size, const void* data, D3D12_HEAP_TYPE type, D3D12_RESOURCE_FLAGS flags, const wchar_t* name);
+
+	ComPtr<ID3D12Resource> CreateBuffer(
+		size_t size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState, D3D12_HEAP_TYPE heapType, const wchar_t* name = nullptr);
+
+	DxrObject::Descriptor CreateStructuredSRV(
+		ID3D12Resource* resource,
+		UINT numElements, UINT firstElement, UINT stride);
+
+	D3D12_RAYTRACING_GEOMETRY_DESC GetGeometryDesc(const PolygonMesh& mesh);
+
+	AccelerationStructureBuffers CreateAccelerationStructure(
+		const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& desc
+	);
+
+	uint8_t* WriteShaderRecord(uint8_t* dst, const PolygonMesh& mesh, UINT recordSize);
+
+	UINT WriteGPUDescriptor(void* dst, const DxrObject::Descriptor& descriptor) {
+		auto handle = descriptor.handleGPU;
+		memcpy(dst, &handle, sizeof(handle));
+		return UINT(sizeof(handle));
+	}
 
 };
 
@@ -194,6 +244,8 @@ private:
 ////////////////////////////////////////////////////////////////////////////////////////////
 namespace Create {
 
-	void Plane(std::vector<VertexData>& vertex, std::vector<UINT>& index);
+	void Plane(std::vector<VertexDataDXR>& vertex, std::vector<UINT>& index);
+
+	void Cube(std::vector<VertexDataDXR>& vertex, std::vector<UINT>& index);
 
 }
