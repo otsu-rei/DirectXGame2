@@ -505,7 +505,7 @@ void DxrCommon::CreateStateObject() {
 
 	shaderConfig->Config(payloadSize, attributeSize);
 
-	// localがないので飛ばしとく error出たらここが原因かも
+	// local
 	auto localRootSignature
 		= stateObjectDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
 

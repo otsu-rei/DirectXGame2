@@ -141,6 +141,7 @@ void mainCHS(inout Payload payload, in MyAttrbute attrib) {
 	}
 	if (id == 1) {
 		payload.color = Reflection(vtx.Position, vtx.Normal, vtx.Color.rgb, payload.recursive);
+		
 		return;
 	}
 }
