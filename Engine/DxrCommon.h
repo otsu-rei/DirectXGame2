@@ -111,6 +111,8 @@ public:
 	void BeginFrame();
 	void EndFrame();
 
+	void DxrUpdate();
+
 	void DxrRender(); //!< Test method
 
 	void Sent();
@@ -174,6 +176,12 @@ private:
 	ComPtr<ID3D12Resource> shaderTable_;
 	D3D12_DISPATCH_RAYS_DESC dispatchRayDesc_;
 
+	// constantBuffer
+	ComPtr<ID3D12Resource> lightBuffer_;
+
+	Vector3f rotate_ = { 0.0f, 0.0f, 0.0f };
+	ComPtr<ID3D12Resource> rotateBuffer_;
+
 	//=========================================================================================
 	// private methods
 	//=========================================================================================
@@ -196,6 +204,8 @@ private:
 	/// new
 
 	void CreateObject();
+
+	void CreateConstantBuffer();
 
 	void CreateSceneBLAS();
 

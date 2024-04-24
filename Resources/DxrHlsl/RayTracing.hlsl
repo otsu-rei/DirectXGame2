@@ -25,6 +25,16 @@ struct Vertex {
 StructuredBuffer<uint> indexBuffer : register(t0, space1);
 StructuredBuffer<Vertex> vertexBuffer : register(t1, space1);
 
+struct DirectionalLight {
+	float3 direction;
+};
+ConstantBuffer<DirectionalLight> gLight : register(b0);
+
+struct RotateMatrix {
+	float4x4 rotateMatrix;
+};
+ConstantBuffer<RotateMatrix> gRotateMatrix : register(b1);
+
 // return to color
 float3 Reflection(float3 vertexPos, float3 vertexNormal, float3 vertexColor, int recursive) {
 	float3 worldPos = mul(float4(vertexPos, 1), ObjectToWorld4x3());
@@ -137,7 +147,13 @@ void mainCHS(inout Payload payload, in MyAttrbute attrib) {
 	uint id = InstanceID();
 	
 	if (id == 0) {
-		payload.color = vtx.Color.rgb;
+
+		
+		float3 worldNormal = mul(vtx.Normal, (float3x3)ObjectToWorld4x3());
+		float NdotL = dot(normalize(worldNormal), -gLight.direction);
+		float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+		
+		payload.color = vtx.Color.rgb * cos;
 	}
 	if (id == 1) {
 		payload.color = Reflection(vtx.Position, vtx.Normal, vtx.Color.rgb, payload.recursive);

@@ -44,6 +44,7 @@ void DxrCommon::Init(WinApp* winApp, int32_t clientWidth, int32_t clientHeight) 
 	CreateShaderTable(clientWidth, clientHeight);*/
 
 	CreateObject();
+	CreateConstantBuffer();
 	CreateSceneBLAS();
 	CreateSceneTLAS();
 	CreateGlobalRootSignature();
@@ -119,6 +120,9 @@ void DxrCommon::EndFrame() {
 	command_->Reset();
 }
 
+void DxrCommon::DxrUpdate() {
+}
+
 void DxrCommon::DxrRender() {
 
 	backBufferIndex_ = swapChain_->GetSwapChain()->GetCurrentBackBufferIndex();
@@ -132,6 +136,7 @@ void DxrCommon::DxrRender() {
 	commandList->SetComputeRootSignature(rootSignatureGlobal_.Get());
 
 	commandList->SetComputeRootDescriptorTable(0, tlasDescriptor_.handleGPU);
+	commandList->SetComputeRootConstantBufferView(1, lightBuffer_->GetGPUVirtualAddress());
 
 	// レイトレーシング結果バッファを UAV 状態へ.
 	auto barrierToUAV = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -776,6 +781,25 @@ void DxrCommon::CreateObject() {
 
 }
 
+void DxrCommon::CreateConstantBuffer() {
+	lightBuffer_ = CreateBuffer(
+		sizeof(Vector3f),
+		D3D12_RESOURCE_FLAG_NONE,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		D3D12_HEAP_TYPE_UPLOAD
+	);
+
+	Vector3f direction = Vector::Normalize({-0.5f, 0.0, 1.0f});
+
+	void* dst = nullptr;
+	lightBuffer_->Map(0, nullptr, &dst);
+	if (dst) {
+		memcpy(dst, &direction, sizeof(Vector3f));
+		lightBuffer_->Unmap(0, nullptr);
+	}
+
+}
+
 void DxrCommon::CreateSceneBLAS() {
 	auto planeGeometryDesc = GetGeometryDesc(plane_);
 	auto cubeGeometryDesc = GetGeometryDesc(cube_);
@@ -913,13 +937,14 @@ void DxrCommon::DeployObjects(std::vector<D3D12_RAYTRACING_INSTANCE_DESC>& insta
 }
 
 void DxrCommon::CreateGlobalRootSignature() {
-	std::array<CD3DX12_ROOT_PARAMETER, 1> rootParams;
+	std::array<CD3DX12_ROOT_PARAMETER, 2> rootParams;
 
 	// TLAS を t0 レジスタに割り当てて使用する設定.
 	CD3DX12_DESCRIPTOR_RANGE descRangeTLAS;
 	descRangeTLAS.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
 	rootParams[0].InitAsDescriptorTable(1, &descRangeTLAS);
+	rootParams[1].InitAsConstantBufferView(0);
 
 	D3D12_ROOT_SIGNATURE_DESC rootSigDesc{};
 	rootSigDesc.NumParameters = UINT(rootParams.size());
