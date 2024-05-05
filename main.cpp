@@ -21,6 +21,7 @@
 
 // Game
 #include <Floor/Floor.h>
+#include <Sphere/Sphere.h>
 #include <Logger.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,6 +48,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// Floor
 	//-----------------------------------------------------------------------------------------
 	auto floor = std::make_unique<Floor>();
+	auto sphere = std::make_unique<Sphere>();
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 	// メインループ
@@ -67,6 +69,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		ImGui::Begin("main");
 		floor->SetOnImGui();
+		sphere->SetOnImGui();
 		ImGui::End();
 
 		//=========================================================================================
@@ -74,6 +77,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//=========================================================================================
 
 		floor->Draw();
+		sphere->Draw();
 		
 		MyEngine::EndFrame();
 	}
@@ -83,6 +87,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	camera2D.reset();
 
 	floor.reset();
+	sphere.reset();
 
 	MyEngine::Finalize();
 	

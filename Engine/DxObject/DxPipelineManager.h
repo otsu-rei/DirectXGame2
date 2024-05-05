@@ -20,6 +20,7 @@
 enum PipelineType {
 	FLOOR,
 	PARTICLE,
+	SPHERE,
 
 	kCountOfPipeline
 };

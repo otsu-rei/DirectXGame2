@@ -189,4 +189,22 @@ void DxObject::PipelineManager::CreatePipelineTable() {
 		);
 	}
 
+	// sphere
+	{
+		// rootSignatureDescsの初期化
+		DxObject::RootSignatureDescs desc(1, 0);
+
+		// parameterの設定
+		//!< Matrix
+		desc.param[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		desc.param[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_VERTEX;
+		desc.param[0].Descriptor.ShaderRegister = 0;
+
+		pipelineMenbers_[PipelineType::SPHERE].rootSignature = std::make_unique<DxObject::RootSignature>(devices_, desc);
+
+		pipelineMenbers_[PipelineType::SPHERE].shaderBlob = std::make_unique<DxObject::ShaderBlob>(
+			L"Sphere.VS.hlsl", L"Sphere.PS.hlsl"
+		);
+	}
+
 }

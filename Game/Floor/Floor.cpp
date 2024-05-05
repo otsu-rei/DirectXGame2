@@ -58,7 +58,6 @@ void Floor::Update() {
 	// matrix
 	Matrix4x4 world = Matrix::MakeAffine(transform_.scale, transform_.rotate, transform_.translate);
 
-
 	matrixResource_->operator[](0).world = world;
 	matrixResource_->operator[](0).wvp = world * MyEngine::camera3D_->GetViewProjectionMatrix();
 	matrixResource_->operator[](0).worldInverseTranspose = world;

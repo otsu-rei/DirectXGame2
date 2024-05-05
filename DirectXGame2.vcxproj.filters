@@ -109,6 +109,12 @@
     <Filter Include="Engine\DxrObject\source">
       <UniqueIdentifier>{d4e808f0-59d0-4f07-bc11-d0e972703443}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game\Sphere">
+      <UniqueIdentifier>{6c6e3599-e033-4366-bae2-5c7490b62130}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\hlsl\Sphere">
+      <UniqueIdentifier>{959df1f1-630d-44c9-b8d8-1bf92343d31c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -249,6 +255,9 @@
     </ClCompile>
     <ClCompile Include="Engine\DxrObject\DxrDevices.cpp">
       <Filter>Engine\DxrObject\source</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Sphere\Sphere.cpp">
+      <Filter>Game\Sphere</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -402,6 +411,9 @@
     <ClInclude Include="Engine\DxrObject\DxrDevices.h">
       <Filter>Engine\DxrObject\include</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Sphere\Sphere.h">
+      <Filter>Game\Sphere</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
@@ -410,6 +422,12 @@
     </None>
     <None Include="Resources\hlsl\Floor.hlsli">
       <Filter>Resource\hlsl\Floor</Filter>
+    </None>
+    <None Include="Resources\hlsl\Sphere.hlsli">
+      <Filter>Resource\hlsl\Sphere</Filter>
+    </None>
+    <None Include="Resources\hlsl\Lighting.hlsli">
+      <Filter>Resource\hlsl</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -435,6 +453,12 @@
     </FxCompile>
     <FxCompile Include="Resources\hlsl\Floor.PS.hlsl">
       <Filter>Resource\hlsl\Floor</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\hlsl\Sphere.PS.hlsl">
+      <Filter>Resource\hlsl\Sphere</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\hlsl\Sphere.VS.hlsl">
+      <Filter>Resource\hlsl\Sphere</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
