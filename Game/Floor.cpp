@@ -98,7 +98,7 @@ void Floor::Draw() { //!< param[3], [4]をdescriptorTableにするとvertex関�
 
 	// ParamBuffers
 	commandList->SetGraphicsRootConstantBufferView(0, matrixResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(1, MyEngine::camera3D_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1, MyEngine::camera3D->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(2, materialResource_->GetGPUVirtualAddress());
 	
 	commandList->SetGraphicsRootDescriptorTable(3, MyEngine::GetTextureHandleGPU("resources/tile_black.png"));

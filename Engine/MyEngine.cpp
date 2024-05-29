@@ -40,8 +40,8 @@ namespace {
 //-----------------------------------------------------------------------------------------
 // static variables
 //-----------------------------------------------------------------------------------------
-Camera3D* MyEngine::camera3D_ = nullptr;
-Camera2D* MyEngine::camera2D_ = nullptr;
+Camera3D* MyEngine::camera3D = nullptr;
+Camera2D* MyEngine::camera2D = nullptr;
 
 //-----------------------------------------------------------------------------------------
 // method
@@ -68,7 +68,7 @@ void MyEngine::Initialize(int32_t kWindowWidth, int32_t kWindowHeight, const cha
 	{
 		sDirectXRCommon = DirectXRCommon::GetInstance();
 		sDirectXRCommon->Init(sWinApp, kWindowWidth, kWindowHeight);
-		sDirectXRCommon->InitRayTracing(kWindowWidth, kWindowHeight);
+		/*sDirectXRCommon->InitRayTracing(kWindowWidth, kWindowHeight);*/
 		ExternalLogger::Write("Complete Initialize: sDirectXRCommon");
 
 	}
@@ -109,7 +109,7 @@ void MyEngine::Finalize() {
 	sImGuiManager->Term();
 	sImGuiManager = nullptr;
 
-	sDirectXRCommon->TermRayTracing();
+	/*sDirectXRCommon->TermRayTracing();*/
 	sDirectXRCommon->Term();
 	sDirectXRCommon = nullptr;
 

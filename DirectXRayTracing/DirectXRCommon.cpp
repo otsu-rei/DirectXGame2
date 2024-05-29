@@ -124,7 +124,7 @@ void DirectXRCommon::DrawRasterlize() {
 	{
 		room_->SetBuffers(commandList, 0);
 
-		commandList->SetGraphicsRootConstantBufferView(0, MyEngine::camera3D_->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(0, MyEngine::camera3D->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootConstantBufferView(1, material_->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootConstantBufferView(2, light_->GetGPUVirtualAddress());
 
@@ -134,7 +134,7 @@ void DirectXRCommon::DrawRasterlize() {
 	{
 		teapot_->SetBuffers(commandList, 0);
 
-		commandList->SetGraphicsRootConstantBufferView(0, MyEngine::camera3D_->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(0, MyEngine::camera3D->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootConstantBufferView(1, material_->GetGPUVirtualAddress());
 		commandList->SetGraphicsRootConstantBufferView(2, light_->GetGPUVirtualAddress());
 

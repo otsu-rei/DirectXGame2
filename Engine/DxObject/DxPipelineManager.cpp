@@ -268,4 +268,40 @@ void DxObject::PipelineManager::CreatePipelineTable() {
 		blob->Create(L"GaussianBlur.VS.hlsl", VERTEX);
 		blob->Create(L"GaussianBlur.PS.hlsl", PIXEL);
 	}
+
+	{
+		// rootSignatureDescの初期化
+		RootSignatureDesc desc;
+		desc.Resize(7, 0);
+
+		// mesh
+		//!< vertices
+		desc.SetSRV(0, SHADER_MESH, 0);
+
+		//!< uniqueVertexIndices
+		desc.SetSRV(1, SHADER_MESH, 1);
+
+		//!< primitiveIndices
+		desc.SetSRV(2, SHADER_MESH, 2);
+
+		//!< meshlets
+		desc.SetSRV(3, SHADER_MESH, 3);
+
+		//!< TransformationMatrix
+		desc.SetCBV(4, SHADER_MESH, 0);
+
+		//!< Material
+		desc.SetCBV(5, SHADER_PIXEL, 0);
+
+		//!< camera
+		desc.SetCBV(6, SHADER_MESH, 1);
+
+
+		pipelineMenbers_[PipelineType::PLAYER].rootSignature = std::make_unique<DxObject::RootSignature>(devices_, desc);
+
+		pipelineMenbers_[PipelineType::PLAYER].shaderBlob = std::make_unique<DxObject::ShaderBlob>();
+		auto blob = pipelineMenbers_[PipelineType::PLAYER].shaderBlob.get();
+		blob->Create(L"Default.MS.hlsl", MESH);
+		blob->Create(L"Player.PS.hlsl", PIXEL);
+	}
 }

@@ -67,7 +67,7 @@ void Plane::Draw() {
 
 	// ParamBuffers
 	commandList->SetGraphicsRootConstantBufferView(0, matrixResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(1, MyEngine::camera3D_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1, MyEngine::camera3D->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(2, materialResource_->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootDescriptorTable(3, MyEngine::GetTextureHandleGPU("resources/uvChecker.png"));

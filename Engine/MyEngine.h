@@ -143,8 +143,8 @@ public:
 	// public variables
 	//=========================================================================================
 	
-	static Camera3D* camera3D_;
-	static Camera2D* camera2D_;
+	static Camera3D* camera3D;
+	static Camera2D* camera2D;
 
 private:
 };

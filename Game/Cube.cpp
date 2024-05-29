@@ -50,7 +50,7 @@ void Cube::Draw() {
 	// ParamBuffers
 	commandList->SetGraphicsRootConstantBufferView(4, matrixResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(5, materialResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(6, MyEngine::camera3D_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(6, MyEngine::camera3D->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootDescriptorTable(7, MyEngine::GetTextureHandleGPU("resources/uvChecker.png"));
 
 	mesh_->Dispatch(0, 1, 2, 3);

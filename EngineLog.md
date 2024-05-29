@@ -44,11 +44,10 @@ Complete Initialize: sWinApp
 [DxObject.ShaderBlob]: shaderBlob_[0] << Complete Create
 [DxObject::ShaderTable]: GaussianBlur.PS.hlsl << Complete Create
 [DxObject.ShaderBlob]: shaderBlob_[1] << Complete Create
--- DXR version is compatible.
-[DxrObject::RootSignature]: rootSignature_ << Complete Create
-[DxrObject::LoaclRootSignature]: rootSignature_ << Complete Create
-[DxrObject::LoaclRootSignature]: rootSignature_ << Complete Create
-[DxrObject::ShaderManager]: ./resources/raytracingShader/raytracing.hlsl << Complete Create
+[DxObject.RootSignature]: rootSignature_ << Complete Create
+[DxObject.ShaderBlob]: shaderBlob_[2] << Complete Create
+[DxObject::ShaderTable]: Player.PS.hlsl << Complete Create
+[DxObject.ShaderBlob]: shaderBlob_[1] << Complete Create
 Complete Initialize: sDirectXRCommon
 Complete Initialize: sImGuiManager
 Complete Initialize: sTextureManager
