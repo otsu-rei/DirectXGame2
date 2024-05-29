@@ -7,7 +7,7 @@
 void BreakEffect::Init() {
 	screenModel_ = std::make_unique<Model>("./resources/model", "glassScreen.obj");
 
-
+	assert(screenModel_->GetSize() < kMatrixNum_);
 }
 
 void BreakEffect::Term() {

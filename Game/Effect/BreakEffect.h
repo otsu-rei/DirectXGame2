@@ -46,6 +46,12 @@ private:
 	// private variables
 	//=========================================================================================
 
+	// IA
 	std::unique_ptr<Model> screenModel_;
+
+	// constantBuffer
+	static const uint32_t kMatrixNum_ = 10;
+	std::unique_ptr<DxObject::BufferResource<TransformationMatrix>> matrixs_[kMatrixNum_];
+	
 
 };
