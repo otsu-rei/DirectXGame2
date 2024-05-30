@@ -98,6 +98,12 @@ void BreakEffect::SetAttributeImGui() {
 		isStart_ = true;
 	}
 
+	ImGui::SameLine();
+
+	if (ImGui::Button("stop")) {
+		isStart_ = false;
+	}
+
 }
 
 float LerpDivision(float t, uint32_t division, float easePoint, int currentIndex) {
