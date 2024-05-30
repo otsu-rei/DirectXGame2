@@ -52,7 +52,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)\Game\Entity;$(ProjectDir)\Game\Scene;$(ProjectDir)\Game;$(ProjectDir)\Lib\Adapter\Performance;$(ProjectDir)\Lib\Adapter\Random;$(ProjectDir)\Lib\Adapter\Json;$(ProjectDir)\Lib\Collider;$(ProjectDir)\Lib\Light;$(ProjectDir)\Lib\Camera;$(ProjectDir)\Lib\Geometry;$(ProjectDir)\Lib;$(ProjectDir)\externals\meshoptimizer;$(ProjectDir)\externals\assimp\include;$(ProjectDir)\externals\nlohmann;$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\Engine\DxObject;$(ProjectDir)\Engine;$(ProjectDir)\DirectXRayTracing;$(ProjectDir)\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\Game\Effect;$(ProjectDir)\Game\Entity;$(ProjectDir)\Game\Scene;$(ProjectDir)\Game;$(ProjectDir)\Lib\Adapter\Performance;$(ProjectDir)\Lib\Adapter\Random;$(ProjectDir)\Lib\Adapter\Json;$(ProjectDir)\Lib\Collider;$(ProjectDir)\Lib\Light;$(ProjectDir)\Lib\Camera;$(ProjectDir)\Lib\Geometry;$(ProjectDir)\Lib;$(ProjectDir)\externals\meshoptimizer;$(ProjectDir)\externals\assimp\include;$(ProjectDir)\externals\nlohmann;$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\Engine\DxObject;$(ProjectDir)\Engine;$(ProjectDir)\DirectXRayTracing;$(ProjectDir)\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -172,6 +172,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="Lib\Camera\Camera3D.cpp" />
     <ClCompile Include="Lib\Collider\Collider.cpp" />
     <ClCompile Include="Lib\DrawMethod.cpp" />
+    <ClCompile Include="Lib\Easing.cpp" />
     <ClCompile Include="Lib\Geometry\Matrix3x3.cpp" />
     <ClCompile Include="Lib\Geometry\Matrix4x4.cpp" />
     <ClCompile Include="Lib\Geometry\Vector2.cpp" />
@@ -248,6 +249,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="Lib\Camera\Camera3D.h" />
     <ClInclude Include="Lib\Collider\Collider.h" />
     <ClInclude Include="Lib\DrawMethod.h" />
+    <ClInclude Include="Lib\Easing.h" />
     <ClInclude Include="Lib\Environment.h" />
     <ClInclude Include="Lib\Geometry\Matrix3x3.h" />
     <ClInclude Include="Lib\Geometry\Matrix4x4.h" />

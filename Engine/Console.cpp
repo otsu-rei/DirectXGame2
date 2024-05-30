@@ -67,6 +67,7 @@ void Console::Update() {
 		OutputOutliner();
 		OutputPerformance();
 		OutputSystem();
+		OutputAssets();
 	}
 }
 
@@ -291,6 +292,15 @@ void Console::OutputSystem() {
 	ImGui::End();
 }
 
+void Console::OutputAssets() {
+	static bool isOpenWindow = true;
+	ImGui::Begin("Assets", &isOpenWindow, windowFlags);
+
+	ListFilesAndDirectories("./resources");
+
+	ImGui::End();
+}
+
 void Console::SetTextureImGui(const D3D12_GPU_DESCRIPTOR_HANDLE& texture) {
 	{
 		//タブ等を除いたウィンドウのサイズを取得(計算)
@@ -321,4 +331,19 @@ void Console::SetTextureImGui(const D3D12_GPU_DESCRIPTOR_HANDLE& texture) {
 	}
 }
 
-
+void ListFilesAndDirectories(const std::filesystem::path& directory) {
+	for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+		if (std::filesystem::is_directory(entry)) {
+			// ディレクトリの場合はTreeNodeと再帰的な呼び出し
+			if (ImGui::TreeNode(entry.path().filename().string().c_str())) {
+				ListFilesAndDirectories(entry);
+				ImGui::TreePop();
+			}
+		} else {
+			// ファイルの場合はSelectable
+			if (ImGui::Selectable(entry.path().filename().string().c_str())) {
+				// ファイルが選択されたときの処理
+			}
+		}
+	}
+}

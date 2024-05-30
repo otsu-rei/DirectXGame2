@@ -304,4 +304,27 @@ void DxObject::PipelineManager::CreatePipelineTable() {
 		blob->Create(L"Default.MS.hlsl", MESH);
 		blob->Create(L"Player.PS.hlsl", PIXEL);
 	}
+
+	{
+		// rootSignatureDesc
+		RootSignatureDesc desc;
+		desc.Resize(3, 1);
+
+		//!< matrix
+		desc.SetCBV(0, SHADER_VERTEX, 0);
+
+		//!< camera2D
+		desc.SetCBV(1, SHADER_VERTEX, 1);
+
+		//!< textureBuffer
+		desc.SetSRV(2, SHADER_PIXEL, 0);
+		desc.SetSampler(0, MODE_WRAP, SHADER_PIXEL, 0);
+
+		pipelineMenbers_[PipelineType::BREAKEFFECT].rootSignature = std::make_unique<DxObject::RootSignature>(devices_, desc);
+
+		pipelineMenbers_[PipelineType::BREAKEFFECT].shaderBlob = std::make_unique<DxObject::ShaderBlob>();
+		auto blob = pipelineMenbers_[PipelineType::BREAKEFFECT].shaderBlob.get();
+		blob->Create(L"BreakEffect.VS.hlsl", VERTEX);
+		blob->Create(L"BreakEffect.PS.hlsl", PIXEL);
+	}
 }

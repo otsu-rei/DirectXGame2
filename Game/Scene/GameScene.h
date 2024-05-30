@@ -9,6 +9,7 @@
 // Game
 #include <Floor.h>
 #include <Player.h>
+#include <BreakEffect.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // GameScene class
@@ -36,6 +37,9 @@ private:
 	// Game
 	std::unique_ptr<Floor> floor_;
 	std::unique_ptr<Player> player_;
+
+	// effect
+	std::unique_ptr<BreakEffect> breakEffect_;
 
 	//=========================================================================================
 	// private methods

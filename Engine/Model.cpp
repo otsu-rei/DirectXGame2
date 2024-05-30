@@ -122,6 +122,7 @@ ModelData ModelMethods::LoadObjFile(const std::string& directoryPath, const std:
 				normals.clear();
 
 				vertexDatas.clear();
+				indexDatas.clear();
 
 				faces.clear();
 				vertexDataIndexCount = 0;
@@ -290,6 +291,7 @@ ModelData ModelMethods::LoadObjFile(const std::string& directoryPath, const std:
 		normals.clear();
 
 		vertexDatas.clear();
+		indexDatas.clear();
 
 		faces.clear();
 	}

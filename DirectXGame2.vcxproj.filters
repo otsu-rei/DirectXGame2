@@ -379,6 +379,9 @@
     <ClCompile Include="Game\Effect\BreakEffect.cpp">
       <Filter>Game\Effect</Filter>
     </ClCompile>
+    <ClCompile Include="Lib\Easing.cpp">
+      <Filter>Lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\MyEngine.h">
@@ -602,6 +605,9 @@
     </ClInclude>
     <ClInclude Include="Game\Effect\BreakEffect.h">
       <Filter>Game\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Lib\Easing.h">
+      <Filter>Lib</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

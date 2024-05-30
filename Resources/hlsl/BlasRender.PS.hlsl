@@ -35,7 +35,7 @@ PSOutput main(VSOutput input) {
 	PSOutput output;
 	
 	output.color = gMaterial.color;
-	output.color.rgb *= HalfLambertReflection(input.normal, gLight.direction);
+	output.color.rgb *= HalfLambertReflection(input.normal, -gLight.direction);
 	output.color.rgb = ToonShading(output.color.rgb, 10);
 	
 	return output;

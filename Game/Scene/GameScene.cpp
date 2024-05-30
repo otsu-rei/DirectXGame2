@@ -36,7 +36,7 @@ void GameScene::Run() {
 		MyEngine::BeginDraw();
 
 		//=========================================================================================
-		// オフスクリーン描画処理
+		// 描画処理
 		//=========================================================================================
 
 		Draw();
@@ -61,7 +61,7 @@ void GameScene::Init() {
 
 	floor_ = std::make_unique<Floor>();
 	player_ = std::make_unique<Player>();
-
+	breakEffect_ = std::make_unique<BreakEffect>();
 }
 
 void GameScene::Term() {
@@ -70,6 +70,7 @@ void GameScene::Term() {
 void GameScene::Update() {
 	floor_->Update();
 	player_->Update();
+	breakEffect_->Update();
 }
 
 void GameScene::Draw() {
@@ -89,13 +90,13 @@ void GameScene::Draw() {
 
 		MyEngine::EndOffScreen();
 
-		MyEngine::BeginOffScreen(MyEngine::GetTexture("offscreen"));
+		breakEffect_->Draw(MyEngine::GetTexture("offscreen"), console_->GetSceneTexture()->GetSRVHandleGPU());
+
+		/*MyEngine::BeginOffScreen(MyEngine::GetTexture("offscreen"));
 		MyEngine::camera3D = camera_.get();
 
-		
-
-
-		MyEngine::EndOffScreen();
+	
+		MyEngine::EndOffScreen();*/
 	}
 
 	MyEngine::TransitionProcess();

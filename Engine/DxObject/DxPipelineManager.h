@@ -24,6 +24,7 @@ enum PipelineType {
 	BLASRENDER,
 	GAUSSIANBLUR,
 	PLAYER,
+	BREAKEFFECT,
 
 	kCountOfPipeline
 };

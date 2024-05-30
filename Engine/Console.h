@@ -15,6 +15,7 @@
 #include <string>
 #include <list>
 #include <memory>
+#include <filesystem>
 
 // geometry
 #include <Vector4.h>
@@ -133,9 +134,11 @@ private:
 
 	void OutputOutliner();
 
-	// test made
 	void OutputSystem();
+	void OutputAssets();
 
 	void SetTextureImGui(const D3D12_GPU_DESCRIPTOR_HANDLE& texture);
 
 };
+
+void ListFilesAndDirectories(const std::filesystem::path& directory);

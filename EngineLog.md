@@ -48,6 +48,11 @@ Complete Initialize: sWinApp
 [DxObject.ShaderBlob]: shaderBlob_[2] << Complete Create
 [DxObject::ShaderTable]: Player.PS.hlsl << Complete Create
 [DxObject.ShaderBlob]: shaderBlob_[1] << Complete Create
+[DxObject.RootSignature]: rootSignature_ << Complete Create
+[DxObject::ShaderTable]: BreakEffect.VS.hlsl << Complete Create
+[DxObject.ShaderBlob]: shaderBlob_[0] << Complete Create
+[DxObject::ShaderTable]: BreakEffect.PS.hlsl << Complete Create
+[DxObject.ShaderBlob]: shaderBlob_[1] << Complete Create
 Complete Initialize: sDirectXRCommon
 Complete Initialize: sImGuiManager
 Complete Initialize: sTextureManager
