@@ -9,6 +9,7 @@
 // Game
 #include <Floor.h>
 #include <Player.h>
+#include <Plane.h>
 #include <BreakEffect.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +38,7 @@ private:
 	// Game
 	std::unique_ptr<Floor> floor_;
 	std::unique_ptr<Player> player_;
+	std::unique_ptr<Plane> plane_;
 
 	// effect
 	std::unique_ptr<BreakEffect> breakEffect_;

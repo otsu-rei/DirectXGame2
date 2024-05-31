@@ -61,6 +61,8 @@ void GameScene::Init() {
 
 	floor_ = std::make_unique<Floor>();
 	player_ = std::make_unique<Player>();
+	plane_ = std::make_unique<Plane>();
+
 	breakEffect_ = std::make_unique<BreakEffect>();
 }
 
@@ -70,6 +72,7 @@ void GameScene::Term() {
 void GameScene::Update() {
 	floor_->Update();
 	player_->Update();
+	plane_->Update();
 	breakEffect_->Update();
 }
 
@@ -87,6 +90,7 @@ void GameScene::Draw() {
 
 		floor_->Draw();
 		player_->Draw();
+		plane_->Draw();
 
 		MyEngine::EndOffScreen();
 

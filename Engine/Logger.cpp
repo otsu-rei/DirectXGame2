@@ -93,7 +93,7 @@ void AssertHRESULT(const HRESULT& hr) {
 // ExternalLogger class
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-bool ExternalLogger::isOutput_ = true;
+bool ExternalLogger::isOutput_ = false;
 
 const std::string ExternalLogger::filename_ = "EngineLog";
 std::ofstream ExternalLogger::file_;

@@ -2,6 +2,7 @@
 
 #include "MyEngine.h"
 #include "Console.h"
+#include "TextureManager.h"
 
 using namespace DxObject;
 
@@ -40,6 +41,15 @@ void Plane::Init() {
 	matrixResource_->operator[](0).world = Matrix4x4::MakeIdentity();
 	matrixResource_->operator[](0).worldInverseTranspose = Matrix4x4::MakeIdentity();
 
+	// textures
+	textureNames_ = {
+		"uvChecker.png",
+		"tile_black.png",
+		"monsterBall.png",
+	};
+
+	texture_ = textureNames_[0];
+
 }
 
 void Plane::Term() {
@@ -47,6 +57,8 @@ void Plane::Term() {
 	indexResource_.reset();
 	matrixResource_.reset();
 	materialResource_.reset();
+
+	textureNames_.clear();
 }
 
 void Plane::Update() {
@@ -70,7 +82,7 @@ void Plane::Draw() {
 	commandList->SetGraphicsRootConstantBufferView(1, MyEngine::camera3D->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(2, materialResource_->GetGPUVirtualAddress());
 
-	commandList->SetGraphicsRootDescriptorTable(3, MyEngine::GetTextureHandleGPU("resources/uvChecker.png"));
+	commandList->SetGraphicsRootDescriptorTable(3, MyEngine::GetTextureHandleGPU("resources/" + texture_));
 
 
 	// mesh param
@@ -85,4 +97,16 @@ void Plane::SetAttributeImGui() {
 	ImGui::DragFloat3("rotate",    &transform_.rotate.x,    0.01f);
 	ImGui::DragFloat3("translate", &transform_.translate.x, 0.01f);
 	ImGui::ColorEdit4("color", &material_.color.r);
+
+	if (ImGui::BeginCombo("texture", texture_.c_str())) {
+		for (const auto& texture : textureNames_) {
+			bool isSelect = (texture == texture_);
+
+			if (ImGui::Selectable(texture.c_str(), isSelect)) {
+				texture_ = texture;
+			}
+		}
+
+		ImGui::EndCombo();
+	}
 }

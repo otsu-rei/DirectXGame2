@@ -64,4 +64,8 @@ private:
 	std::unique_ptr<DxObject::BufferResource<TransformationMatrix>> matrixResource_;
 	Transform transform_;
 
+	// textures
+	std::vector<std::string> textureNames_;
+	std::string texture_;
+
 };

@@ -54,7 +54,7 @@ void BreakEffect::Update() {
 		float t_2 = LerpDivision(EaseInQuint(t_), screenModel_->GetSize(), easeingPoint_, i);
 		float rotateT = LerpDivision(EaseInOutQuad(t_), screenModel_->GetSize(), easeingPoint_, i);
 
-		transforms_[i].translate.y = std::lerp(0.0f, -0.02f, t_2);
+		transforms_[i].translate.y = std::lerp(0.0f, -0.03f, t_2);
 		transforms_[i].rotate.x = std::lerp(0.0f, -std::numbers::pi_v<float> / 2.0f, rotateT);
 		matrixs_[i]->operator[](0).world = Matrix::MakeAffine(scale_, transforms_[i].rotate, transforms_[i].translate);
 	}
